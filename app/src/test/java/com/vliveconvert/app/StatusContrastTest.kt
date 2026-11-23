@@ -60,7 +60,10 @@ class StatusContrastTest {
         val rowBg = scheme.surfaceContainerLow
         assertContrast("$label 成功态文字 / 行底色", status.success, rowBg, TEXT_MIN)
         assertContrast("$label 警告态文字 / 行底色", status.warning, rowBg, TEXT_MIN)
-        assertContrast("$label 进行中文字 / 行底色", status.info, rowBg, TEXT_MIN)
+        // 转换中文字跟随主题主色（莫奈取色）；行底按实际取值：浅色 surface、深色 surfaceContainerLow
+        val busyRowBg = if (light) scheme.surface else scheme.surfaceContainerLow
+        assertContrast("$label 进行中文字(primary) / 行底色",
+            scheme.primary, busyRowBg, TEXT_MIN)
         assertContrast("$label 待转换文字 / 行底色", scheme.onSurfaceVariant, rowBg, TEXT_MIN)
         // 丢位置行 / 失败行：底色分别为 tertiaryContainer / errorContainer
         assertContrast("$label 无位置文字 / 行底色",
@@ -103,7 +106,6 @@ class StatusContrastTest {
     fun statusColorsDifferBetweenThemes() {
         assertTrue("成功色应随主题变化", LightStatusColors.success != DarkStatusColors.success)
         assertTrue("警告色应随主题变化", LightStatusColors.warning != DarkStatusColors.warning)
-        assertTrue("进行中色应随主题变化", LightStatusColors.info != DarkStatusColors.info)
         assertTrue("成功徽标符号色应随主题变化",
             LightStatusColors.onSuccess != DarkStatusColors.onSuccess)
         assertTrue("警告徽标符号色应随主题变化",

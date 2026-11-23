@@ -20,9 +20,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** 放大镜入口：只看原图，不改勾选；查看器里可以连续勾选再返回。 */
+/**
+ * 放大镜入口：只看原图，不改勾选；查看器里可以连续勾选再返回。
+ *
+ * 视口必须是真机量级：Robolectric 默认的 320x470dp 比任何在售手机都矮，
+ * 首行格子的放大镜热区会落进底部悬浮 Dock 的「添加」按钮之下（点击被 CTA 截走）。
+ * 旧断言能过只是因为 12dp 顶距恰好让热区中心差 3dp 躲开按钮——属偶然通过。
+ */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
+@Config(sdk = [34], qualifiers = "w360dp-h792dp-xxhdpi")
 class PickerOriginalViewerTest {
 
     @get:Rule

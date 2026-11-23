@@ -753,11 +753,13 @@ private fun ConvertItemRow(
     }
     val bg by animateColorAsState(bgTarget, tween(300), label = "rowBg")
     val main = MaterialTheme.colorScheme.onSurface
+    // 转换中跟随主题主色（莫奈取色）；固定蓝会在动态取色下与其他强调色脱节
+    val busyColor = MaterialTheme.colorScheme.primary
     val statusColorTarget = when {
         ci.failed -> MaterialTheme.colorScheme.error
         lostGps -> MaterialTheme.colorScheme.tertiary
         ci.done -> status.success
-        busy -> status.info
+        busy -> busyColor
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     // 转换中 → 完成 / 失败的状态切换用颜色缓动，避免文字颜色硬跳
@@ -840,7 +842,7 @@ private fun ConvertItemRow(
                             // 静态弧：固定角度，不建 infinite transition
                             Canvas(Modifier.size(54.dp).align(Alignment.Center)) {
                                 drawArc(
-                                    color = status.info,
+                                    color = busyColor,
                                     startAngle = 70f, sweepAngle = 110f, useCenter = false,
                                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                                 )
@@ -853,7 +855,7 @@ private fun ConvertItemRow(
                             )
                             Canvas(Modifier.size(54.dp).align(Alignment.Center)) {
                                 drawArc(
-                                    color = status.info,
+                                    color = busyColor,
                                     startAngle = -90f + ringAngle, sweepAngle = 110f, useCenter = false,
                                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                                 )

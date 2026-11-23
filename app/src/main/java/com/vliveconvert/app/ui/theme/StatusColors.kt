@@ -25,9 +25,7 @@ data class StatusColors(
     /** 警告态（丢位置）文字 / 徽标填充 */
     val warning: Color,
     /** 警告徽标内的符号色 */
-    val onWarning: Color,
-    /** 进行中态文字（转换中） */
-    val info: Color
+    val onWarning: Color
 )
 
 /** 浅色主题：深色调，保证在浅色行底上有足够对比 */
@@ -35,8 +33,7 @@ val LightStatusColors = StatusColors(
     success = Color(0xFF1E6B2E),
     onSuccess = Color(0xFFFFFFFF),
     warning = Color(0xFF8A5300),
-    onWarning = Color(0xFFFFFFFF),
-    info = Color(0xFF3651E0)
+    onWarning = Color(0xFFFFFFFF)
 )
 
 /** 深色主题：亮色调，保证在深色行底上可读 */
@@ -44,8 +41,7 @@ val DarkStatusColors = StatusColors(
     success = Color(0xFF86E29A),
     onSuccess = Color(0xFF0A2E13),
     warning = Color(0xFFFFD08A),
-    onWarning = Color(0xFF3A2500),
-    info = Color(0xFFBAC3FF)
+    onWarning = Color(0xFF3A2500)
 )
 
 internal val LocalStatusColors = staticCompositionLocalOf { LightStatusColors }

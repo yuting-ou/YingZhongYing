@@ -84,6 +84,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -333,6 +334,27 @@ fun PickerScreen(
             .map { (key, items) -> PickerSection(key, items) }
     }
 
+    // 流式扫描把「今天」插到列表最前面时，LazyGrid 会按原首个可见项的 key 锚定：
+    // 新分区被顶到视口上方，刚好藏在悬浮的「选择照片」面板后面（用户报障的原形）。
+    // 用户没主动离开顶部时把视口钉到最新分区；下拉过就尊重其位置，不抢滚动。
+    var pinnedToTop by remember(bucketId) { mutableStateOf(true) }
+    LaunchedEffect(gridState) {
+        snapshotFlow { gridState.isScrollInProgress }.collect { scrolling ->
+            // 滚动一开始就退出钉顶：用户正拖着列表时来了新分区，也不能抢
+            pinnedToTop = !scrolling &&
+                gridState.firstVisibleItemIndex == 0 &&
+                gridState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    val topSectionKey = sections.firstOrNull()?.key
+    val reduceMotion = LocalReduceMotion.current
+    LaunchedEffect(topSectionKey) {
+        if (topSectionKey != null && pinnedToTop) {
+            if (reduceMotion) gridState.scrollToItem(0)
+            else gridState.animateScrollToItem(0)
+        }
+    }
+
     GlassScrollPauseScope(gridState) {
     Box(Modifier.fillMaxSize()) {
         // 壁纸 + 网格是 Haze 的采样源；浮动导航不在源里，
@@ -468,7 +490,9 @@ fun PickerScreen(
                         isAdded = { it.id in addedIds },
                         contentPadding = PaddingValues(
                             start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin,
-                            top = headerHeight + 12.dp, bottom = 120.dp)
+                            // 多留 20dp 呼吸区：12dp 时首行贴着悬浮面板的阴影带，
+                            // 流式扫描时新结果一帧帧顶上来，像被「选择照片」面板压住
+                            top = headerHeight + 20.dp, bottom = 120.dp)
                     )
                 }
             }
@@ -898,11 +922,22 @@ private fun AlbumGridPage(
                         someSel -> ToggleableState.Indeterminate
                         else -> ToggleableState.Off
                     },
-                    onToggleAll = { onToggleGroup(section.items) }
+                    onToggleAll = { onToggleGroup(section.items) },
+                    // 流式扫描时新分区平滑滑入（此前是硬插，页面整体「怼出来」）
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = tween(220, easing = EaseOutStrong),
+                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = tween(140)
+                    )
                 )
             }
             items(section.items, key = { it.key }, contentType = { "photo" }) { item ->
                 GridCell(
+                    modifier = Modifier.animateItem(
+                        fadeInSpec = tween(220, easing = EaseOutStrong),
+                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = tween(140)
+                    ),
                     item = item,
                     selected = item.id in selectedIds,
                     selectionIndex = selectedIndex[item.id] ?: -1,
@@ -917,7 +952,11 @@ private fun AlbumGridPage(
         if (running) {
             item(span = { GridItemSpan(3) }, contentType = "progress") {
                 Box(
-                    Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                    Modifier.animateItem(
+                        fadeInSpec = tween(200),
+                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = tween(160)
+                    ).fillMaxWidth().padding(vertical = 20.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(strokeWidth = 3.dp)
@@ -956,13 +995,14 @@ private fun DateSectionHeader(
     label: String,
     count: Int,
     checkState: ToggleableState,
-    onToggleAll: () -> Unit
+    onToggleAll: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     // 全局栅格：卡片外缘 / 日期行 / 照片网格共用 16dp 竖线。
     // 日期行本身不再加左右内边距——它作为网格的整行 item，已继承 contentPadding 的 16dp；
     // 圆圈右移 5dp 使视觉右缘（26dp 圆在 48dp 触摸目标内的居中留白 11dp）对上第三格徽标
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .padding(start = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -1048,7 +1088,8 @@ private fun GridCell(
     converted: Boolean = false,
     added: Boolean = false,
     onToggle: () -> Unit,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val resolver = LocalContext.current.contentResolver
     val reduceMotion = LocalReduceMotion.current
@@ -1089,7 +1130,7 @@ private fun GridCell(
     )
 
     Box(
-        Modifier
+        modifier
             .aspectRatio(1f)
             .clip(continuousShape(12.dp))
             .clickable(onClick = onToggle)

@@ -1,11 +1,14 @@
 package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.vliveconvert.app.picker.AlbumInfo
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
@@ -83,6 +86,9 @@ class PickerSelectAllTest {
         val older = dateLabel(items.last().sortTime)
         assertTrue("两个日期必须渲染成两个分段标题", newer != older)
         compose.onNodeWithText(newer).assertExists()
+        // 默认测试视口（320x470dp）比任何真机都矮，第二段日期头在 Lazy 组合范围之外；
+        // 显式滚过去再断言，让「按天分段」与视口高度解耦
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(older))
         compose.onNodeWithText(older).assertExists()
     }
 
