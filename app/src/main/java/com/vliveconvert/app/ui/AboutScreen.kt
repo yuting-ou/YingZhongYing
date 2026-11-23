@@ -175,8 +175,8 @@ fun AboutScreen(
                     style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface))
                 Spacer(Modifier.height(4.dp))
-                LicenseLink("https://github.com/yuting-ou/VivoLivePhoto") {
-                    openUrl("https://github.com/yuting-ou/VivoLivePhoto")
+                LicenseLink("https://github.com/yuting-ou/YingZhongYing") {
+                    openUrl("https://github.com/yuting-ou/YingZhongYing")
                 }
                 Spacer(Modifier.height(10.dp))
                 GlassDivider()

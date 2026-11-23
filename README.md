@@ -1,4 +1,4 @@
-# 影中影（Vivo Live Photo yuting改进版）
+# 影中影（YingZhongYing）
 
 **vivo 实况转换工具**：把 vivo 相机实况模式生成的两个文件（.jpg + .mp4）字节级无损合并成一个
 单文件实况（Android）。——把一段会动的时光，收进一张照片。
@@ -7,10 +7,10 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/VivoLivePhoto/releases/tag/v2.8.0) ——
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v2.8.0) ——
 > 点开 `VivoLivePhoto-v2.8.0.apk` 即可直接安装（**正式版** · 位置保障全链闭环 +
 > 液态玻璃 UI + v3 签名轮换；旧版 v2.7.1 及以前可直接覆盖安装，数据保留）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/VivoLivePhoto/releases/download/v2.8.0/VivoLivePhoto-v2.8.0.apk) 下载，内容一致。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v2.8.0/VivoLivePhoto-v2.8.0.apk) 下载，内容一致。
 >
 > **v2.8.0 正式版（test1~test9 迭代转正）**：①液态玻璃全 UI——G2 连续曲率圆角、
 > 玻璃画质标准/流畅两档、滚动降成本、深色模式、≥48dp 触控目标、减少动效收口；
@@ -49,7 +49,7 @@
 >
 > **v2.2.0 起界面整体重构为液态玻璃**（Backdrop 实时折射 + Haze 模糊），已经 vivo X200
 > 系列真机九轮迭代验证；转换核心与数据逻辑零改动。有问题可回退
-> [v2.1.0](https://github.com/yuting-ou/VivoLivePhoto/releases/tag/v2.1.0)。
+> [v2.1.0](https://github.com/yuting-ou/YingZhongYing/releases/tag/v2.1.0)。
 >
 > **v2.3.0 打磨弹窗退场动效，进度条与输入框统一为玻璃件，并修掉大字号提示裁切、浅色主题
 > 状态栏白图标两处细节。**

@@ -174,7 +174,8 @@ internal object XmpTemplate {
             .replace("{pts}", ptsUs.toString())
         if (gpsAttrs.isNotEmpty() || sourceFingerprint != null) {
             // 注入命名空间声明（写在 VCamera 声明行之前）。vlp 是本应用的自定义命名空间：
-            // 源指纹只服务于「异源不覆盖」判定，动图识别（MotionPhoto/Container）不受影响
+            // 源指纹只服务于「异源不覆盖」判定，动图识别（MotionPhoto/Container）不受影响。
+            // 命名空间 URI 是产物格式标识，不随 GitHub 仓库改名而变化——改了会改变所有产物字节
             val nsLines = buildList {
                 if (gpsAttrs.isNotEmpty()) {
                     add("xmlns:exif=\"http://ns.adobe.com/exif/1.0/\"")

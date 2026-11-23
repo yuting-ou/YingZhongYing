@@ -1299,7 +1299,7 @@ class MainActivity : ComponentActivity() {
                                     try {
                                         startActivity(
                                             Intent(Intent.ACTION_VIEW, Uri.parse(
-                                                "https://github.com/yuting-ou/VivoLivePhoto/releases/latest")))
+                                                "https://github.com/yuting-ou/YingZhongYing/releases/latest")))
                                     } catch (_: Exception) {
                                         ConvertCenter.statusText = "无法打开浏览器"
                                     }
