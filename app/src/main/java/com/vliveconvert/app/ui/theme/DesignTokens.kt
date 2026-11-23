@@ -59,6 +59,9 @@ object DesignTokens {
     val CheckBadgeSize = 22.dp
 
     // ── 字号阶梯 ──
+    /** 应用大标题（主界面/权限页） */
+    val AppTitle = 34.sp
+    val AppTitleTracking = (-0.7).sp
     /** 子页面标题（找回位置/修复时间/破损修复） */
     val TitleSubpage = 28.sp
     val TitleSubpageTracking = (-0.5).sp

@@ -55,6 +55,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.clipRect
+import com.vliveconvert.app.ui.theme.DesignTokens
 import com.vliveconvert.app.ui.theme.statusColors
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -1071,7 +1072,8 @@ fun GlassOutlineButton(
 
 @Composable
 fun glassTitleStyle(): TextStyle = TextStyle(
-    fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.7).sp,
+    fontSize = DesignTokens.AppTitle, fontWeight = FontWeight.Bold,
+    letterSpacing = DesignTokens.AppTitleTracking,
     color = MaterialTheme.colorScheme.onBackground)
 
 @Composable

@@ -120,12 +120,14 @@ fun FixTimeScreen(
     val state = remember(bucketId) { if (bucketId != null) scanner.stateOf(bucketId) else null }
     val results = state?.results
     val total = state?.total ?: 0
+    val reduceMotion = LocalReduceMotion.current
     val scanProgress by produceState(0 to false, state) {
         val s = state ?: return@produceState // 无相册：不轮询（否则永不完成、每 200ms 空转）
         while (true) {
             val doneAll = s.completed
-            // 以 !completed 兜底，避免收尾瞬间的撕裂读把 spinner 永久锁在「扫描中」
-            value = s.doneCount.get() to (s.running && !doneAll)
+            // 以「未收敛」而非 running 作为忙碌判据：查询阶段 running 还没置位，
+            // 按 running 判定会先闪一帧「没有待修复的单文件实况」的假空态
+            value = s.doneCount.get() to !doneAll
             if (doneAll) break // 扫描完成即终止轮询，避免空转耗电
             delay(200)
         }
@@ -209,7 +211,8 @@ fun FixTimeScreen(
                 }
             }
         }
-        AnimatedVisibility(visible = scanning) {
+        // total==0 是「正在读取相册」的查询阶段：只留文字，不启动无限进度动画
+        AnimatedVisibility(visible = scanning && total > 0) {
             GlassIndeterminateBar(
                 Modifier.padding(horizontal = DesignTokens.ScreenHMargin, vertical = 6.dp).height(3.dp)
             )
@@ -221,7 +224,9 @@ fun FixTimeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                if (scanning) "扫描中 ${scanProgress.first}/$total" else "${results?.size ?: 0} 个单文件实况",
+                if (scanning) {
+                    if (total == 0) "正在读取相册…" else "扫描中 ${scanProgress.first}/$total"
+                } else "${results?.size ?: 0} 个单文件实况",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -321,10 +326,11 @@ fun FixTimeScreen(
                         items(groupItems, key = { it.key }) { item ->
                             FixCell(
                                 modifier = Modifier.animateItem(
-                                    fadeInSpec = tween(200, easing = EaseOutStrong),
-                                    placementSpec = spring(
+                                    fadeInSpec = if (reduceMotion) null
+                                    else tween(200, easing = EaseOutStrong),
+                                    placementSpec = if (reduceMotion) null else spring(
                                         dampingRatio = 0.9f, stiffness = 380f),
-                                    fadeOutSpec = tween(140)
+                                    fadeOutSpec = if (reduceMotion) null else tween(140)
                                 ),
                                 item = item,
                                 selected = selected.any { it.id == item.id },
@@ -332,7 +338,7 @@ fun FixTimeScreen(
                             )
                         }
                     }
-                    if (scanning) {
+                    if (scanning && total > 0) {
                         item(span = { GridItemSpan(2) }) {
                             Box(
                                 Modifier.fillMaxWidth().padding(vertical = 20.dp),

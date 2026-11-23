@@ -77,8 +77,9 @@ fun PermissionScreen(
             ) {
                 Text(
                     appName,
-                    style = TextStyle(fontSize = 34.sp, fontWeight = FontWeight.Bold,
-                        letterSpacing = (-0.7).sp,
+                    style = TextStyle(fontSize = DesignTokens.AppTitle,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = DesignTokens.AppTitleTracking,
                         color = MaterialTheme.colorScheme.onBackground),
                     modifier = Modifier.graphicsLayer {
                         val p = reveal(0)

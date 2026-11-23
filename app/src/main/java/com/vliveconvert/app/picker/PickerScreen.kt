@@ -215,10 +215,10 @@ fun PickerScreen(
         val s = state ?: return@produceState // 无相册：不轮询（否则永不完成、每 200ms 空转）
         while (true) {
             val doneAll = s.completed
-            // running 与 completed 是两个独立变量：收尾瞬间可能先读到 running=true、
-            // 再读到 completed=true，若直接用 running 会让 spinner 永久卡在「扫描中」，
-            // 故以 !completed 兜底
-            value = s.doneCount.get() to (s.running && !doneAll)
+            // 以「未收敛」而非 running 作为忙碌判据：enter() 的查询阶段 running 还没置位，
+            // 若按 running 判定，首开会先闪一帧「没有找到双文件实况照片」的假空态。
+            // 扫描失败/空相册都会收敛到 completed，故 !completed 不会永久卡住。
+            value = s.doneCount.get() to !doneAll
             if (doneAll) break
             delay(200)
         }
@@ -484,7 +484,7 @@ fun PickerScreen(
                                 previewIndex = idx
                             }
                         },
-                        running = running && !globalMode,
+                        running = running && !globalMode && total > 0,
                         // 「已转」角标此前从未接上（默认恒 false，只有筛选生效）：一并接上
                         isConverted = convertedChecker,
                         isAdded = { it.id in addedIds },
@@ -641,7 +641,8 @@ fun PickerScreen(
                         when {
                             globalMode && globalSearching -> "全库搜索中…"
                             globalMode -> "全局匹配 ${visible.size} 张"
-                            running -> "扫描中 ${progress.first}/$total"
+                            running -> if (total == 0) "正在读取相册…"
+                            else "扫描中 ${progress.first}/$total"
                             searchQuery.isNotBlank() -> "匹配 ${visible.size} 张"
                             onlyUnconverted -> "未转换 ${visible.size} 张"
                             else -> "${results?.size ?: 0} 张双文件实况"
@@ -680,7 +681,8 @@ fun PickerScreen(
                         )
                     }
                 }
-                if (running) {
+                // total==0 是「正在读取相册」的查询阶段：只留文字，不启动无限进度动画
+                if (running && total > 0) {
                     Spacer(Modifier.height(4.dp))
                     GlassIndeterminateBar(
                         Modifier.padding(top = 2.dp, bottom = 2.dp).height(3.dp)
@@ -723,21 +725,24 @@ fun PickerScreen(
         //    遮罩淡入淡出；面板弹簧上滑「弹出」，退场更快 ──
         AnimatedVisibility(
             visible = showAlbumSheet,
-            enter = fadeIn(tween(160, easing = EaseOutStrong)),
-            exit = fadeOut(tween(120))
+            enter = fadeIn(if (reduceMotion) snap() else tween(160, easing = EaseOutStrong)),
+            exit = fadeOut(if (reduceMotion) snap() else tween(120))
         ) {
             AlbumSheet(
                 modifier = Modifier.animateEnterExit(
-                    // 「弹出来」：位移弹簧带一点回弹，缩放锚在底边中点
+                    // 「弹出来」：位移弹簧带一点回弹，缩放锚在底边中点；减少动效时直切
                     enter = slideInVertically(
-                        animationSpec = spring(dampingRatio = 0.9f, stiffness = 380f)
+                        animationSpec = if (reduceMotion) snap()
+                        else spring(dampingRatio = 0.9f, stiffness = 380f)
                     ) { it } + scaleIn(
                         initialScale = 0.94f,
-                        animationSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+                        animationSpec = if (reduceMotion) snap()
+                        else spring(dampingRatio = 0.9f, stiffness = 380f),
                         transformOrigin = TransformOrigin(0.5f, 1f)
                     ),
-                    exit = slideOutVertically(tween(160)) { it / 2 } + scaleOut(
-                        targetScale = 0.96f, animationSpec = tween(160)
+                    exit = slideOutVertically(
+                        tween(if (reduceMotion) 0 else 160)) { it / 2 } + scaleOut(
+                        targetScale = 0.96f, animationSpec = tween(if (reduceMotion) 0 else 160)
                     )
                 ),
                 albums = albums,
@@ -898,6 +903,8 @@ private fun AlbumGridPage(
     running: Boolean,
     contentPadding: PaddingValues = PaddingValues()
 ) {
+    // 减少动效时不给插入/重排动画（null = 该项动画关闭），与全应用动效门控同一判据
+    val reduceMotion = LocalReduceMotion.current
     LazyVerticalGrid(
         state = gridState,
         columns = GridCells.Fixed(3),
@@ -925,18 +932,20 @@ private fun AlbumGridPage(
                     onToggleAll = { onToggleGroup(section.items) },
                     // 流式扫描时新分区平滑滑入（此前是硬插，页面整体「怼出来」）
                     modifier = Modifier.animateItem(
-                        fadeInSpec = tween(220, easing = EaseOutStrong),
-                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
-                        fadeOutSpec = tween(140)
+                        fadeInSpec = if (reduceMotion) null else tween(220, easing = EaseOutStrong),
+                        placementSpec = if (reduceMotion) null
+                        else spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = if (reduceMotion) null else tween(140)
                     )
                 )
             }
             items(section.items, key = { it.key }, contentType = { "photo" }) { item ->
                 GridCell(
                     modifier = Modifier.animateItem(
-                        fadeInSpec = tween(220, easing = EaseOutStrong),
-                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
-                        fadeOutSpec = tween(140)
+                        fadeInSpec = if (reduceMotion) null else tween(220, easing = EaseOutStrong),
+                        placementSpec = if (reduceMotion) null
+                        else spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = if (reduceMotion) null else tween(140)
                     ),
                     item = item,
                     selected = item.id in selectedIds,
@@ -953,9 +962,10 @@ private fun AlbumGridPage(
             item(span = { GridItemSpan(3) }, contentType = "progress") {
                 Box(
                     Modifier.animateItem(
-                        fadeInSpec = tween(200),
-                        placementSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
-                        fadeOutSpec = tween(160)
+                        fadeInSpec = if (reduceMotion) null else tween(200),
+                        placementSpec = if (reduceMotion) null
+                        else spring(dampingRatio = 0.9f, stiffness = 380f),
+                        fadeOutSpec = if (reduceMotion) null else tween(160)
                     ).fillMaxWidth().padding(vertical = 20.dp),
                     contentAlignment = Alignment.Center
                 ) {

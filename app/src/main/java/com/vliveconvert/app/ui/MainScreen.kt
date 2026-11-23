@@ -465,10 +465,10 @@ fun MainScreen(
                                     items(items, key = { it.item.key }) { ci ->
                                         ConvertItemRow(
                                             modifier = Modifier.animateItem(
-                                                fadeInSpec = tween(220),
-                                                placementSpec = spring(
+                                                fadeInSpec = if (reduceMotion) null else tween(220),
+                                                placementSpec = if (reduceMotion) null else spring(
                                                     dampingRatio = 0.9f, stiffness = 380f),
-                                                fadeOutSpec = tween(180)
+                                                fadeOutSpec = if (reduceMotion) null else tween(180)
                                             ),
                                             ci = ci,
                                             onRemove = { onRemove(ci) },

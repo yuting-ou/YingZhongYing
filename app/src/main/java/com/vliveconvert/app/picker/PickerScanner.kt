@@ -138,7 +138,7 @@ class PickerScanner(
                 // 收敛点（必须无条件到达）：空相册 / 查询无结果时若直接跳过，
                 // UI 的完成轮询（每 200ms）永不终止 → 空转耗电，且进度条永久停在「扫描中」。
                 // 先置 completed 再清 running，避免「已读到 running=true、随后读到 completed=true」
-                // 的撕裂读把 spinner 锁死（UI 侧同时按 running && !completed 判定，双保险）。
+                // 的撕裂读把 spinner 锁死（UI 侧以 !completed 作为忙碌判据，双保险）。
                 // 身份守卫：join() 之后到此处没有挂起点，被 cancel 的旧 job 仍可能执行到这里；
                 // 若它已被新 job 取代（st.job 变了），就绝不能替新扫描写下「已完成」。
                 if (st.job === self) {
