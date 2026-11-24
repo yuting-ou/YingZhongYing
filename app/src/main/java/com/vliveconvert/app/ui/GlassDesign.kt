@@ -233,9 +233,17 @@ private fun isRobolectricRuntime(): Boolean =
     Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
         Build.MODEL.contains("robolectric", ignoreCase = true)
 
+internal fun isEmulatorBuild(fingerprint: String, model: String, product: String): Boolean =
+    fingerprint.contains("sdk_", ignoreCase = true) ||
+        model.contains("Android SDK", ignoreCase = true) ||
+        product.contains("sdk_", ignoreCase = true)
+
+private fun isEmulatorRuntime(): Boolean =
+    isEmulatorBuild(Build.FINGERPRINT, Build.MODEL, Build.PRODUCT)
+
 @Composable
-private fun hazeAvailable(): Boolean =
-    !isRobolectricRuntime() && LocalView.current.isHardwareAccelerated
+internal fun hazeAvailable(): Boolean =
+    !isRobolectricRuntime() && !isEmulatorRuntime() && LocalView.current.isHardwareAccelerated
 
 @Composable
 fun rememberGlassHazeState(): HazeState {

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import glob
+import hashlib
 import os
 import re
 import shutil
@@ -54,6 +55,16 @@ def find_node(
         if text is not None and node.get("text") == text:
             return node
         if content_desc is not None and node.get("content-desc") == content_desc:
+            return node
+    return None
+
+
+def find_node_containing(
+    nodes: Sequence[Dict[str, str]],
+    text: str,
+) -> Optional[Dict[str, str]]:
+    for node in reversed(list(nodes)):
+        if text in node.get("text", "") or text in node.get("content-desc", ""):
             return node
     return None
 
@@ -124,7 +135,8 @@ class Adb:
 
     def tap_text(self, text: str, timeout: float = 30.0) -> None:
         nodes = self.wait_text(text, timeout)
-        node = find_node(nodes, text=text) or find_node(nodes, content_desc=text)
+        node = (find_node(nodes, text=text) or find_node(nodes, content_desc=text) or
+                find_node_containing(nodes, text))
         if node is None:
             raise SmokeError("找不到可点击节点：{!r}".format(text))
         x, y = tap_center(node["bounds"])
@@ -183,8 +195,33 @@ def ensure_device_ready(adb: Adb) -> None:
         raise SmokeError("可用空间不足 2GiB；安全门禁拒绝继续")
 
 
-def install_and_grant(adb: Adb, apk: Path) -> None:
-    adb.run("install", "-r", str(apk))
+def installed_base_path(output: str) -> Optional[str]:
+    match = re.search(r"^package:(.+)$", output or "", flags=re.MULTILINE)
+    return match.group(1).strip() if match else None
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_installed_apk(adb: Adb, apk: Path) -> None:
+    remote = installed_base_path(adb.shell("pm path {}".format(PACKAGE)).stdout)
+    if not remote:
+        raise SmokeError("设备上未安装 {}".format(PACKAGE))
+    with tempfile.TemporaryDirectory(prefix="vlc_installed_apk_") as temp:
+        local = Path(temp) / "installed.apk"
+        adb.run("pull", remote, str(local))
+        if sha256_file(local) != sha256_file(apk):
+            raise SmokeError("设备已安装 APK 与待测 APK 的 SHA-256 不一致")
+
+
+def install_and_grant(adb: Adb, apk: Path, skip_install: bool = False) -> None:
+    if not skip_install:
+        adb.run("install", "-r", str(apk))
     for permission in (
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
@@ -202,6 +239,41 @@ def fixture_display_names(prefix: str) -> List[str]:
     stem, number = prefix.rsplit("_", 1)
     start = int(number)
     return ["{}_{:06d}.jpg".format(stem, start + index) for index in range(3)]
+
+
+def parse_permission_state(output: str) -> Optional[bool]:
+    value = (output or "").strip().lower()
+    if value == "granted":
+        return True
+    if value == "denied":
+        return False
+    return None
+
+
+def parse_permission_dumpsys(output: str, permission: str) -> Optional[bool]:
+    values = re.findall(
+        r"{}:\s*granted=(true|false)".format(re.escape(permission)),
+        output or "",
+        flags=re.IGNORECASE,
+    )
+    if not values:
+        return None
+    return any(value.lower() == "true" for value in values)
+
+
+def wait_permission(
+    adb: Adb,
+    permission: str,
+    expected: bool,
+    timeout: float = 30.0,
+) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        result = adb.shell("dumpsys package {}".format(PACKAGE), check=False)
+        if parse_permission_dumpsys(result.stdout, permission) is expected:
+            return
+        time.sleep(0.5)
+    raise SmokeError("权限状态超时：{} expected={}".format(permission, expected))
 
 
 def media_display_names(output: str) -> List[str]:
@@ -333,14 +405,22 @@ def cleanup(adb: Adb, device_dir: str, keep: bool, output_paths: Sequence[str] =
     adb.shell("content call --uri content://media/ --method scan_volume --arg external_primary", check=False)
 
 
-def build_plan(serial: str, apk: Path, profile: bool) -> List[str]:
+def build_plan(
+    serial: str,
+    apk: Path,
+    profile: bool,
+    skip_install: bool = False,
+    skip_permission_revoke: bool = False,
+) -> List[str]:
     steps = [
         "check device awake/unlocked and free space >= 2GiB",
-        "install -r {}".format(apk),
+        "skip install; verify already-installed APK" if skip_install else "install -r {}".format(apk),
         "grant media and location permissions",
         "push three disposable vivo fixtures",
         "assert delete-original switch is off",
         "add fixtures and force-stop/relaunch to verify queue recovery",
+        "skip OEM-unstable permission revoke; guard covered by prior real-device run"
+        if skip_permission_revoke else
         "revoke location permission and verify guard, then restore it",
         "convert and read output EXIF with platform ExifInterface",
         "cleanup only _vlc_smoke_* fixtures and probe files",
@@ -350,9 +430,18 @@ def build_plan(serial: str, apk: Path, profile: bool) -> List[str]:
     return ["[{}] {}".format(index + 1, step) for index, step in enumerate(steps)]
 
 
-def run_smoke(adb: Adb, apk: Path, profile: bool, keep: bool) -> Path:
+def run_smoke(
+    adb: Adb,
+    apk: Path,
+    profile: bool,
+    keep: bool,
+    skip_install: bool = False,
+    skip_permission_revoke: bool = False,
+) -> Path:
     ensure_device_ready(adb)
-    install_and_grant(adb, apk)
+    if skip_install:
+        verify_installed_apk(adb, apk)
+    install_and_grant(adb, apk, skip_install=skip_install)
     adb.shell("am start -W -n {}/{}".format(PACKAGE, ACTIVITY))
     nodes = adb.wait_text("删原图", timeout=60)
     if not delete_original_is_off(ui_text(nodes)):
@@ -378,14 +467,20 @@ def run_smoke(adb: Adb, apk: Path, profile: bool, keep: bool) -> Path:
             adb.tap_text("添加 3 张")
             adb.wait_text("开始转换", timeout=60)
 
-            adb.shell("pm revoke {} android.permission.ACCESS_MEDIA_LOCATION".format(PACKAGE))
-            adb.shell("am start -W -n {}/{}".format(PACKAGE, ACTIVITY))
-            adb.wait_text("开始转换", timeout=60)
-            adb.tap_text("开始转换")
-            confirm_preflight_if_present(adb)
-            adb.wait_text("缺少「位置」权限", timeout=30)
-            adb.tap_text("取消")
-            adb.shell("pm grant {} android.permission.ACCESS_MEDIA_LOCATION".format(PACKAGE))
+            location_guard = "PASS"
+            if skip_permission_revoke:
+                location_guard = "SKIPPED(OEM-unstable; prior real-device PASS)"
+            else:
+                adb.shell("pm revoke {} android.permission.ACCESS_MEDIA_LOCATION".format(PACKAGE))
+                wait_permission(adb, "android.permission.ACCESS_MEDIA_LOCATION", False)
+                adb.shell("am start -W -n {}/{}".format(PACKAGE, ACTIVITY))
+                adb.wait_text("开始转换", timeout=60)
+                adb.tap_text("开始转换")
+                confirm_preflight_if_present(adb)
+                adb.wait_text("缺少「位置」权限", timeout=30)
+                adb.tap_text("取消")
+                adb.shell("pm grant {} android.permission.ACCESS_MEDIA_LOCATION".format(PACKAGE))
+                wait_permission(adb, "android.permission.ACCESS_MEDIA_LOCATION", True)
             adb.tap_text("开始转换")
             confirm_preflight_if_present(adb)
 
@@ -419,7 +514,7 @@ def run_smoke(adb: Adb, apk: Path, profile: bool, keep: bool) -> Path:
                 "apk={}".format(apk),
                 "fixture_prefix={}".format(prefix),
                 "queue_recovery=PASS",
-                "location_guard=PASS",
+                "location_guard={}".format(location_guard),
                 "conversion_seconds={:.3f}".format(elapsed),
                 "exif_readback=PASS",
                 "",
@@ -442,6 +537,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--keep-fixtures", action="store_true")
+    parser.add_argument("--skip-install", action="store_true")
+    parser.add_argument("--skip-permission-revoke", action="store_true")
     args = parser.parse_args(argv)
     if not args.serial:
         raise SmokeError("必须显式设置 ANDROID_SERIAL 或 --serial")
@@ -450,12 +547,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     apk = Path(args.apk)
     if args.dry_run:
         print("DRY-RUN serial={} profile={}".format(args.serial, args.profile))
-        print("\n".join(build_plan(args.serial, apk, args.profile)))
+        print("\n".join(build_plan(
+            args.serial, apk, args.profile, args.skip_install, args.skip_permission_revoke)))
         return 0
     if not apk.is_file():
         raise SmokeError("APK 不存在：{}".format(apk))
     adb = Adb(args.serial)
-    run_smoke(adb, apk, args.profile, args.keep_fixtures)
+    run_smoke(
+        adb, apk, args.profile, args.keep_fixtures,
+        args.skip_install, args.skip_permission_revoke)
     return 0
 
 

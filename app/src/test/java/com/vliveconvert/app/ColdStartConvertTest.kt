@@ -395,4 +395,19 @@ class ColdStartConvertTest {
         assertTrue("在途 job 目录不能被冷启动清理误删",
             freshJob.exists() && File(freshJob, "IMG_Y.jpg").exists())
     }
+
+    @org.junit.Test
+    fun recoveredNoticeTracksOnlyUnfinishedItems() {
+        val done = ConvertItem(item = sampleItem("IMG_RECOVERED_DONE"), done = true, status = "完成")
+        val pending = ConvertItem(item = sampleItem("IMG_RECOVERED_PENDING"), status = "待转换")
+
+        val doneId = done.item.id
+        val pendingId = pending.item.id
+        val newlyAdded = ConvertItem(item = sampleItem("IMG_NEW_AFTER_RECOVERY"), status = "待转换")
+
+        assertEquals(0, recoveredPendingCount(setOf(doneId), listOf(done)))
+        assertEquals(1, recoveredPendingCount(setOf(doneId, pendingId), listOf(done, pending)))
+        assertEquals(0, recoveredPendingCount(setOf(doneId), listOf(done, newlyAdded)))
+        assertEquals(0, recoveredPendingCount(emptySet(), listOf(pending)))
+    }
 }

@@ -11,7 +11,9 @@ import com.vliveconvert.app.service.effectiveBudgetBytes
 import com.vliveconvert.app.service.effectiveConcurrency
 import com.vliveconvert.app.service.effectiveScanThreads
 import com.vliveconvert.app.service.effectiveThumbThreads
+import com.vliveconvert.app.service.matchingPreset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,6 +83,12 @@ class PerfProfileTest {
         assertEquals(4, perf.concurrency)
         assertEquals(6, perf.scanThreads)
         assertEquals(6, perf.thumbThreads)
+    }
+
+    @Test
+    fun matchingPresetRequiresAllFourKnobsToMatch() {
+        assertEquals(PerfPreset.Balanced, PerfPreset.Balanced.apply().matchingPreset())
+        assertNull(PerfPreset.Balanced.apply().copy(concurrency = 3).matchingPreset())
     }
 
     @Test

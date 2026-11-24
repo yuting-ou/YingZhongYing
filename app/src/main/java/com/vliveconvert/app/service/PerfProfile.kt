@@ -71,6 +71,14 @@ internal fun PerfSettings.applyPreset(preset: PerfPreset): PerfSettings {
         thumbThreads = p.thumbThreads)
 }
 
+internal fun PerfSettings.matchingPreset(): PerfPreset? =
+    PerfPreset.entries.firstOrNull { preset ->
+        val p = preset.apply()
+        manual == p.manual && concurrency == p.concurrency &&
+            memoryLimitMb == p.memoryLimitMb && scanThreads == p.scanThreads &&
+            thumbThreads == p.thumbThreads
+    }
+
 /** 自动挡 = v2.7 行为：大堆 2 路、小堆 1 路 */
 internal fun autoConcurrency(maxMemory: Long): Int =
     if (maxMemory >= 384L * 1024 * 1024) 2 else 1

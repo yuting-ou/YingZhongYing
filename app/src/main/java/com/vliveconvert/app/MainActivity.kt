@@ -380,8 +380,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var scanner: PickerScanner
     private var showPicker by mutableStateOf(false)
     private var pickerAlbums by mutableStateOf<List<AlbumInfo>>(emptyList())
-    /** 进程被杀后恢复的待转换条数：驱动主界面 Notice 卡 */
-    private var recoveredQueueCount by mutableStateOf(0)
+    /** 进程被杀后恢复的条目 id：Notice 只统计这些条目，不能误算后来新加的照片 */
+    private var recoveredItemIds by mutableStateOf<Set<Long>>(emptySet())
 
     // 权限
     private var showSettingsDialog by mutableStateOf(false)
@@ -415,6 +415,7 @@ class MainActivity : ComponentActivity() {
     private val KEY_TRASH_REMAINING = "trash_remaining"
     private val KEY_TRASH_CONFIRMED = "trash_confirmed"
     private val KEY_TRASH_RESULT = "trash_result"
+    private val KEY_RECOVERED_IDS = "recovered_ids"
     private val KEY_RESTORE_CURRENT = "restore_current"
     private val KEY_RESTORE_REMAINING = "restore_remaining"
     private val KEY_RESTORE_CONFIRMED = "restore_confirmed"
@@ -498,6 +499,7 @@ class MainActivity : ComponentActivity() {
             outState.putInt(KEY_TRASH_RESULT, pendingDeleteResultCode)
         }
         // 恢复弹窗悬着时重建：分批状态同样必须幸存，否则系统侧已恢复、应用记录不更新
+        outState.putLongArray(KEY_RECOVERED_IDS, recoveredItemIds.toLongArray())
         if (restoreCurrent.isNotEmpty() || restoreRemainingUris.isNotEmpty()) {
             outState.putStringArrayList(KEY_RESTORE_CURRENT, ArrayList(restoreCurrent))
             outState.putStringArrayList(KEY_RESTORE_REMAINING, ArrayList(restoreRemainingUris))
@@ -934,6 +936,7 @@ class MainActivity : ComponentActivity() {
             deleteConfirmedUris = ArrayList(
                 savedInstanceState.getStringArrayList(KEY_TRASH_CONFIRMED) ?: emptyList())
             pendingDeleteResultCode = savedInstanceState.getInt(KEY_TRASH_RESULT, -1)
+            recoveredItemIds = savedInstanceState.getLongArray(KEY_RECOVERED_IDS)?.toSet() ?: emptySet()
             restoreCurrent = savedInstanceState.getStringArrayList(KEY_RESTORE_CURRENT) ?: emptyList()
             restoreRemainingUris = savedInstanceState.getStringArrayList(KEY_RESTORE_REMAINING) ?: emptyList()
             restoreConfirmedUris = ArrayList(
@@ -961,7 +964,7 @@ class MainActivity : ComponentActivity() {
             if (pending > 0) {
                 withContext(Dispatchers.Main) {
                     // 恢复提示走主界面 Notice 卡（顶栏一行小字用户注意不到）
-                    recoveredQueueCount = pending
+                    recoveredItemIds = ConvertCenter.lastRestoredIds
                 }
             }
         }
@@ -1379,7 +1382,8 @@ class MainActivity : ComponentActivity() {
                                     it.done && it.lostGps && !it.failed
                                 },
                                 onReconvertLostGps = { reconvertLostGpsItems() },
-                                recoveredQueueCount = recoveredQueueCount,
+                                recoveredQueueCount = recoveredPendingCount(
+                                    recoveredItemIds, ConvertCenter.items),
                                 onReconvertItem = { ci -> reconvertOneItem(ci) },
                                 outputRelPath = outputRelPath,
                                 moveToCamera = moveToCamera,
@@ -2653,7 +2657,9 @@ class MainActivity : ComponentActivity() {
     private fun clearAllWithUndo() {
         val snapshot = ConvertCenter.itemsSnapshot()
         if (snapshot.isEmpty()) return
+        val recoveredSnapshot = recoveredItemIds
         ConvertCenter.items.clear()
+        recoveredItemIds = emptySet()
         ConvertCenter.clearQueue(applicationContext)
         ConvertCenter.statusText = "已清空"
         lifecycleScope.launch {
@@ -2668,6 +2674,7 @@ class MainActivity : ComponentActivity() {
                 val restored = merged.size - ConvertCenter.items.size
                 ConvertCenter.items.clear()
                 ConvertCenter.items.addAll(merged)
+                recoveredItemIds = recoveredSnapshot
                 ConvertCenter.persistQueue(applicationContext, merged)
                 ConvertCenter.statusText = "已恢复 $restored 张"
             }
@@ -3079,3 +3086,6 @@ internal fun BatchLogRow(e: BatchLogEntry, onOpen: ((String) -> Unit)? = null) {
         )
     }
 }
+
+internal fun recoveredPendingCount(recoveredIds: Set<Long>, items: List<ConvertItem>): Int =
+    items.count { !it.done && !it.failed && it.item.id in recoveredIds }

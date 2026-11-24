@@ -7,7 +7,10 @@ import com.vliveconvert.app.service.GlassQuality
 import com.vliveconvert.app.ui.LocalGlassQuality
 import com.vliveconvert.app.ui.LocalGlassScrollPaused
 import com.vliveconvert.app.ui.glassOptics
+import com.vliveconvert.app.ui.isEmulatorBuild
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +35,12 @@ class GlassOpticsTest {
         }
         compose.waitForIdle()
         return result!!
+    }
+
+    @Test
+    fun emulatorBuildsUseGlassFallback() {
+        assertTrue(isEmulatorBuild("Android/sdk_phone64_arm64/emu64a:15", "Android SDK built for arm64", "sdk_phone64_arm64"))
+        assertFalse(isEmulatorBuild("vivo/PD2454", "V2454DA", "PD2454"))
     }
 
     @Test

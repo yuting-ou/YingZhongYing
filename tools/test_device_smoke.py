@@ -1,4 +1,6 @@
+import hashlib
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -10,6 +12,19 @@ import device_smoke
 
 
 class DeviceSmokeUnitTest(unittest.TestCase):
+    def test_installed_base_path_parses_pm_path_output(self):
+        output = "package:/data/app/~~abc/com.example/base.apk\n"
+        self.assertEqual("/data/app/~~abc/com.example/base.apk", device_smoke.installed_base_path(output))
+
+    def test_sha256_file_matches_known_bytes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "app.apk"
+            path.write_bytes(b"vlc-apk")
+            self.assertEqual(
+                hashlib.sha256(b"vlc-apk").hexdigest(),
+                device_smoke.sha256_file(path),
+            )
+
     def test_tap_center_parses_uiautomator_bounds(self):
         self.assertEqual((20, 30), device_smoke.tap_center("[10,20][30,40]"))
 
@@ -38,10 +53,22 @@ class DeviceSmokeUnitTest(unittest.TestCase):
         self.assertIs(nodes[0], device_smoke.find_node(nodes, text="添加"))
         self.assertIsNone(device_smoke.find_node(nodes, text="不存在"))
 
+    def test_find_node_containing_matches_counted_button_label(self):
+        nodes = [{"text": "开始转换（3）", "content-desc": "", "bounds": "[0,0][10,10]"}]
+        self.assertIs(nodes[0], device_smoke.find_node_containing(nodes, "开始转换"))
+
     def test_delete_original_must_be_explicitly_off(self):
         self.assertTrue(device_smoke.delete_original_is_off("输出 DCIM/Camera 删原图 关 设置 ›"))
         self.assertFalse(device_smoke.delete_original_is_off("输出 DCIM/Camera 删原图 开 设置 ›"))
         self.assertFalse(device_smoke.delete_original_is_off("设置 ›"))
+
+    def test_permission_state_parses_package_dumpsys(self):
+        permission = "android.permission.ACCESS_MEDIA_LOCATION"
+        self.assertIs(True, device_smoke.parse_permission_dumpsys(
+            "{}: granted=true, flags=[]".format(permission), permission))
+        self.assertIs(False, device_smoke.parse_permission_dumpsys(
+            "{}: granted=false, flags=[]".format(permission), permission))
+        self.assertIsNone(device_smoke.parse_permission_dumpsys("no permission entry", permission))
 
     def test_output_path_excludes_smoke_source_directory(self):
         paths = [
@@ -86,6 +113,26 @@ class DeviceSmokeUnitTest(unittest.TestCase):
             0,
             device_smoke.main([
                 "--dry-run",
+                "--serial", "emulator-5554",
+                "--apk", "/tmp/nonexistent.apk",
+            ]),
+        )
+
+    def test_dry_run_accepts_skip_install(self):
+        self.assertEqual(
+            0,
+            device_smoke.main([
+                "--dry-run", "--skip-install",
+                "--serial", "emulator-5554",
+                "--apk", "/tmp/nonexistent.apk",
+            ]),
+        )
+
+    def test_dry_run_accepts_skip_permission_revoke(self):
+        self.assertEqual(
+            0,
+            device_smoke.main([
+                "--dry-run", "--skip-permission-revoke",
                 "--serial", "emulator-5554",
                 "--apk", "/tmp/nonexistent.apk",
             ]),

@@ -38,13 +38,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -52,7 +49,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.snap
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -86,6 +82,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.service.applyPreset
+import com.vliveconvert.app.service.matchingPreset
 import com.vliveconvert.app.ui.theme.DesignTokens
 
 @Composable
@@ -242,33 +239,17 @@ internal fun SettingsScreen(
                                 Spacer(Modifier.height(12.dp))
                                 GlassDivider()
                                 Spacer(Modifier.height(12.dp))
-                                Text("一键预设（填充下面四个旋钮）", style = settingsDescriptionStyle(),
+                                Text("一键预设", style = settingsDescriptionStyle(),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(2.dp))
-                                // 量墨迹：InlineTextButton 文字内边距 10dp，行整体左移 10dp
-                                // 让「省电/均衡/性能」的字左缘与下方旋钮标题左缘对齐
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    modifier = Modifier.offset(x = (-10).dp)
-                                ) {
-                                    val view = LocalView.current
-                                    com.vliveconvert.app.service.PerfPreset.entries.forEach { p ->
-                                        InlineTextButton(
-                                            text = p.label,
-                                            contentColor = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.semantics {
-                                                contentDescription = "转换预设${p.label}"
-                                            },
-                                            onClick = {
-                                                // 预设是「一键落定」：CONFIRM 触觉 + 旋钮弹簧滑移到新值
-                                                view.performHapticFeedback(
-                                                    HapticFeedbackConstants.CONFIRM)
-                                                onPerfChange(perf.applyPreset(p))
-                                            },
-                                            style = TextStyle(fontSize = 14.sp)
-                                        )
+                                val view = LocalView.current
+                                GlassPresetSelector(
+                                    selected = perf.matchingPreset(),
+                                    onSelect = { preset ->
+                                        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+                                        onPerfChange(perf.applyPreset(preset))
                                     }
-                                }
+                                )
                                 Spacer(Modifier.height(8.dp))
                                 PerfSlider("转换并发", "并发 ${perf.concurrency} 张",
                                     perf.concurrency.toFloat(), 1f..8f, steps = 6, hapticStep = true
@@ -630,15 +611,6 @@ private fun PerfSlider(
 ) {
     val view = LocalView.current
     val reduceMotion = LocalReduceMotion.current
-    val interaction = remember { MutableInteractionSource() }
-    val dragged by interaction.collectIsDraggedAsState()
-    // 预设应用时旋钮滑移（拖动中用原始值，动画不能和手指打架）
-    val animated = animateFloatAsState(
-        targetValue = value.coerceIn(range.start, range.endInclusive),
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f),
-        label = "perfKnob_$title"
-    )
-    val shown = if (dragged || reduceMotion) value else animated.value
     var lastStep by remember(title) { mutableIntStateOf(value.roundToInt()) }
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -659,8 +631,8 @@ private fun PerfSlider(
                     color = MaterialTheme.colorScheme.primary)
             }
         }
-        Slider(
-            value = shown.coerceIn(range.start, range.endInclusive),
+        GlassSlider(
+            value = value,
             onValueChange = { raw ->
                 if (hapticStep) {
                     val step = raw.roundToInt()
@@ -673,9 +645,9 @@ private fun PerfSlider(
             },
             valueRange = range,
             steps = steps,
-            interactionSource = interaction,
+            contentDescription = "$title，$valueLabel",
+            valueLabel = valueLabel,
             modifier = Modifier.fillMaxWidth()
-                .semantics { contentDescription = "$title，$valueLabel" }
         )
     }
 }

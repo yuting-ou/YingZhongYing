@@ -36,6 +36,7 @@ object ConvertCenter {
 
     /** 转换队列（含每项状态），UI 与服务共同读写（写均发生在主线程） */
     val items = mutableStateListOf<ConvertItem>()
+    internal var lastRestoredIds: Set<Long> = emptySet()
 
     var isConverting by mutableStateOf(false)
     var isFinalizing by mutableStateOf(false)
@@ -242,6 +243,7 @@ object ConvertCenter {
         // 合并而不是「非空就整批跳过」：本协程排在 MediaStore 清理之后，
         // 完全可能晚于用户的第一次添加，跳过等于把上次没转完的凭据丢掉
         val missing = mergeRestored(parsed, items.toList()).drop(items.size)
+        lastRestoredIds = missing.mapTo(HashSet()) { it.item.id }
         if (missing.isEmpty()) return 0
         items.addAll(missing)
         return missing.count { !it.done && !it.failed }
