@@ -29,6 +29,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -413,11 +414,15 @@ class MainActivity : ComponentActivity() {
     private val KEY_TRASH_COUNT = "trash_count"
     private val KEY_TRASH_REMAINING = "trash_remaining"
     private val KEY_TRASH_CONFIRMED = "trash_confirmed"
+    private val KEY_TRASH_RESULT = "trash_result"
     private val KEY_RESTORE_CURRENT = "restore_current"
     private val KEY_RESTORE_REMAINING = "restore_remaining"
     private val KEY_RESTORE_CONFIRMED = "restore_confirmed"
     /** 回收站确认弹窗是否已在途（防止 onStart 重复拉起） */
     private var trashRequestInFlight = false
+    private var pendingOperationsReady = false
+    private var savedTrashDialogActive = false
+    private var pendingDeleteResultCode = -1
     /** 恢复原图分批状态（跨重建持久化）：当前批 / 剩余 URI / 已确认记账 */
     private var restoreCurrent: List<String> = emptyList()
     private var restoreRemainingUris: List<String> = emptyList()
@@ -490,6 +495,7 @@ class MainActivity : ComponentActivity() {
             outState.putInt(KEY_TRASH_COUNT, pendingDeleteCount)
             outState.putStringArrayList(KEY_TRASH_REMAINING, ArrayList(deleteRemainingUris))
             outState.putStringArrayList(KEY_TRASH_CONFIRMED, ArrayList(deleteConfirmedUris))
+            outState.putInt(KEY_TRASH_RESULT, pendingDeleteResultCode)
         }
         // 恢复弹窗悬着时重建：分批状态同样必须幸存，否则系统侧已恢复、应用记录不更新
         if (restoreCurrent.isNotEmpty() || restoreRemainingUris.isNotEmpty()) {
@@ -683,8 +689,28 @@ class MainActivity : ComponentActivity() {
     private val deleteRequestLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
+        pendingDeleteResultCode = result.resultCode
+        lifecycleScope.launch {
+            awaitPendingOperationsReady()
+            consumePendingDeleteResult()
+        }
+    }
+
+    private fun consumePendingDeleteResult() {
+        val resultCode = pendingDeleteResultCode
+        if (resultCode < 0) return
+        pendingDeleteResultCode = -1
+        handleDeleteResult(resultCode)
+    }
+
+    private suspend fun awaitPendingOperationsReady() {
+        while (!pendingOperationsReady) delay(50)
+    }
+
+    private fun handleDeleteResult(resultCode: Int) {
+        savedTrashDialogActive = false
         trashRequestInFlight = false
-        if (result.resultCode == RESULT_OK) {
+        if (resultCode == RESULT_OK) {
             // 记录本批被回收的原图，供应用内「恢复原图」撤销（vivo 相册不显示此类项目）
             if (lastTrashUris.isNotEmpty()) {
                 addTrashedRecords(lastTrashUris)
@@ -717,6 +743,7 @@ class MainActivity : ComponentActivity() {
             deleteRemainingUris = emptyList()
             deleteConfirmedUris = arrayListOf()
             ConvertCenter.pendingTrashUris.clear()
+            ConvertCenter.clearPendingOperations(applicationContext)
         }
     }
 
@@ -746,6 +773,7 @@ class MainActivity : ComponentActivity() {
                     deleteRemainingUris = emptyList()
                     deleteConfirmedUris = arrayListOf()
                     ConvertCenter.pendingTrashUris.clear()
+                    ConvertCenter.clearPendingOperations(applicationContext)
                 }
             }
         }
@@ -771,6 +799,7 @@ class MainActivity : ComponentActivity() {
                 rewritten++
             }
         }
+        ConvertCenter.clearPendingOperations(applicationContext)
         if (rewritten > 0) {
             ConvertCenter.persistQueue(applicationContext, ConvertCenter.itemsSnapshot())
         }
@@ -781,34 +810,49 @@ class MainActivity : ComponentActivity() {
      * 原图已删时无同名冲突，文件保持原名；仍有同名则自动序号兜底。
      */
     private fun finalizePendingMoves(baseStatus: String) {
+        if (ConvertCenter.isFinalizing) return
+        ConvertCenter.isFinalizing = true
         val entries = synchronized(ConvertCenter.pendingFinalize) {
             ConvertCenter.pendingFinalize.toList()
         }
-        ConvertCenter.pendingFinalize.clear()
         if (entries.isEmpty()) {
             ConvertCenter.statusText = baseStatus
+            ConvertCenter.clearPendingOperations(applicationContext)
+            ConvertCenter.isFinalizing = false
             return
         }
         lifecycleScope.launch(Dispatchers.IO) {
             var moved = 0
-            for (e in entries) {
-                val okMove = MediaExport.moveUriToCamera(this@MainActivity, e.uri, e.originalName)
-                if (okMove) moved++
-                withContext(Dispatchers.Main) {
-                    val idx = ConvertCenter.items.indexOfFirst { it.item.key == e.itemKey }
-                    if (idx >= 0) {
-                        val ci = ConvertCenter.items[idx]
-                        ConvertCenter.items[idx] = ci.copy(
-                            status = if (okMove) "完成：已以原名移入相机相册"
-                                     else "完成：原名移入失败，文件保留在输出目录"
-                        )
+            var checkpointFailed = false
+            try {
+                for (e in entries) {
+                    val okMove = MediaExport.moveUriToCamera(
+                        this@MainActivity, e.uri, e.originalName, allowCopyFallback = false)
+                    if (okMove) moved++
+                    withContext(Dispatchers.Main) {
+                        val idx = ConvertCenter.items.indexOfFirst { it.item.key == e.itemKey }
+                        if (idx >= 0) {
+                            val ci = ConvertCenter.items[idx]
+                            ConvertCenter.items[idx] = ci.copy(
+                                status = if (okMove) "完成：已以原名移入相机相册"
+                                         else "完成：原名移入失败，文件保留在输出目录"
+                            )
+                        }
+                    }
+                    if (!ConvertCenter.checkpointPendingFinalize(applicationContext, e.itemKey)) {
+                        checkpointFailed = true
                     }
                 }
-            }
-            withContext(Dispatchers.Main) {
-                ConvertCenter.statusText = baseStatus +
-                    (if (moved > 0) "；$moved 个转换结果已以原名移入相机相册" else "")
-                ConvertCenter.persistQueue(applicationContext, ConvertCenter.itemsSnapshot())
+                val snapshot = withContext(Dispatchers.Main) { ConvertCenter.itemsSnapshot() }
+                ConvertCenter.persistQueue(applicationContext, snapshot)
+                if (!checkpointFailed) ConvertCenter.clearPendingOperations(applicationContext)
+                withContext(Dispatchers.Main) {
+                    ConvertCenter.statusText = baseStatus +
+                        (if (moved > 0) "；$moved 个转换结果已以原名移入相机相册" else "") +
+                        (if (checkpointFailed) "；部分进度保存失败，已保留恢复项" else "")
+                }
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) { ConvertCenter.isFinalizing = false }
             }
         }
     }
@@ -889,11 +933,14 @@ class MainActivity : ComponentActivity() {
             deleteRemainingUris = savedInstanceState.getStringArrayList(KEY_TRASH_REMAINING) ?: emptyList()
             deleteConfirmedUris = ArrayList(
                 savedInstanceState.getStringArrayList(KEY_TRASH_CONFIRMED) ?: emptyList())
+            pendingDeleteResultCode = savedInstanceState.getInt(KEY_TRASH_RESULT, -1)
             restoreCurrent = savedInstanceState.getStringArrayList(KEY_RESTORE_CURRENT) ?: emptyList()
             restoreRemainingUris = savedInstanceState.getStringArrayList(KEY_RESTORE_REMAINING) ?: emptyList()
             restoreConfirmedUris = ArrayList(
                 savedInstanceState.getStringArrayList(KEY_RESTORE_CONFIRMED) ?: emptyList())
         }
+        savedTrashDialogActive = savedInstanceState != null &&
+            (lastTrashUris.isNotEmpty() || deleteRemainingUris.isNotEmpty())
 
         // 启动时清理上次残留的暂存产物 + MediaStore 半成品记录；
         // 恢复上次未完成的转换队列（进程被杀时可续转）
@@ -901,6 +948,13 @@ class MainActivity : ComponentActivity() {
             cleanupStaleStagingFiles()
             cleanupPendingMediaStore()
             val pending = ConvertCenter.loadQueue(applicationContext)
+            ConvertCenter.restorePendingOperations(
+                applicationContext, restoreTrash = !savedTrashDialogActive)
+            withContext(Dispatchers.Main) {
+                pendingOperationsReady = true
+                consumePendingDeleteResult()
+                resumePendingOperations()
+            }
             // 队列恢复后再清分享导入缓存：队列条目可能仍引用 shared/import_* 路径，
             // 先清会把「上次没转完的分享照片」的源文件删掉（宁可不扫，不可误删）
             cleanupSharedImportCache()
@@ -969,15 +1023,15 @@ class MainActivity : ComponentActivity() {
                 //   仅前台拉起——后台拉系统弹窗可能直接失败、被误判为用户取消）
                 androidx.compose.runtime.LaunchedEffect(ConvertCenter.pendingTrashCount) {
                     // 仅前台（当前生命周期 ≥ RESUMED）拉起：后台拉系统弹窗可能失败、被误判取消
-                    if (ConvertCenter.pendingTrashCount > 0 &&
-                        !ConvertCenter.isConverting && !trashRequestInFlight &&
-                        lifecycle.currentState.isAtLeast(
-                            androidx.lifecycle.Lifecycle.State.RESUMED)
-                    ) {
-                        trashRequestInFlight = true
-                        lifecycleScope.launch(Dispatchers.IO) {
-                            requestDeleteOriginals(ConvertCenter.statusText)
-                        }
+                    if (lifecycle.currentState.isAtLeast(
+                            androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        resumePendingOperations()
+                    }
+                }
+                androidx.compose.runtime.LaunchedEffect(ConvertCenter.pendingResumeTick) {
+                    if (lifecycle.currentState.isAtLeast(
+                            androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        resumePendingOperations()
                     }
                 }
 
@@ -1804,16 +1858,23 @@ class MainActivity : ComponentActivity() {
         crashLogCount = CrashLog.count(this)
         batchLogCount = BatchLog.load(applicationContext).size
         MotionPrefs.refreshSystem(this)
-        // 前台服务完成批次后若攒下了待确认删除的原图（未授权所有文件访问路径），
-        // 在回到应用时统一拉起系统回收站确认弹窗
-        val pending = synchronized(ConvertCenter.pendingTrashUris) {
-            ConvertCenter.pendingTrashUris.isNotEmpty()
-        }
-        if (pending && !trashRequestInFlight && !ConvertCenter.isConverting) {
-            trashRequestInFlight = true
-            lifecycleScope.launch(Dispatchers.IO) {
-                requestDeleteOriginals(ConvertCenter.statusText)
+        resumePendingOperations()
+    }
+
+    private fun resumePendingOperations() {
+        if (!pendingOperationsReady || savedTrashDialogActive ||
+            ConvertCenter.isConverting || ConvertCenter.isFinalizing || trashRequestInFlight
+        ) return
+        when (ConvertCenter.pendingResumeAction()) {
+            com.vliveconvert.app.service.PendingResumeAction.DELETE -> {
+                trashRequestInFlight = true
+                lifecycleScope.launch(Dispatchers.IO) {
+                    requestDeleteOriginals(ConvertCenter.statusText)
+                }
             }
+            com.vliveconvert.app.service.PendingResumeAction.FINALIZE ->
+                finalizePendingMoves("恢复未完成的原名落地")
+            com.vliveconvert.app.service.PendingResumeAction.NONE -> Unit
         }
     }
 
@@ -1974,6 +2035,10 @@ class MainActivity : ComponentActivity() {
      * 用户本会话已明确选过「仍要转换」则不再重复打扰（批次汇总仍会如实报告）。
      */
     private fun startConvert() {
+        if (ConvertCenter.isFinalizing) {
+            ConvertCenter.statusText = "正在完成上一批的原名落地，请稍候"
+            return
+        }
         if (ConvertCenter.isConverting) return
         if (ConvertCenter.items.none { !it.done && !it.failed }) {
             // 这条必须说话：冷启动会恢复上次的队列，用户再选同一张会被按 id 去重，
@@ -2240,6 +2305,7 @@ class MainActivity : ComponentActivity() {
         withContext(Dispatchers.Main) { ConvertCenter.pendingTrashCount = 0 }
         if (all.isEmpty()) {
             trashRequestInFlight = false
+            resumePendingOperations()
             return
         }
         // 过滤已失效条目，避免请求抛异常（媒体库查询保持在 IO 线程）
@@ -2253,8 +2319,10 @@ class MainActivity : ComponentActivity() {
         }
         if (valid.isEmpty()) {
             trashRequestInFlight = false
+            ConvertCenter.persistPendingOperations(applicationContext)
             withContext(Dispatchers.Main) {
                 ConvertCenter.statusText = "$baseStatus；原图删除失败（无法访问原文件）"
+                resumePendingOperations()
             }
             return
         }
@@ -2273,6 +2341,7 @@ class MainActivity : ComponentActivity() {
             trashRequestInFlight = false
             lastTrashUris = emptyList()
             deleteRemainingUris = emptyList()
+            rewriteDeferredOnDeleteCancel()
             withContext(Dispatchers.Main) {
                 ConvertCenter.statusText = "$baseStatus；原图移入回收站失败（${e.message}）"
             }

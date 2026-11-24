@@ -216,6 +216,24 @@ class DuplicateOutputTest {
      * 不敏感匹配。
      */
     @Test
+    fun movingSameUriTwiceDoesNotRenameOrDuplicate() {
+        val uri = putMedia("Pictures/TestOut", "IMG_MOVE_TWICE.jpg", byteArrayOf(1, 2, 3))
+
+        assertTrue(MediaExport.moveUriToCamera(app, uri, "IMG_MOVE_TWICE.jpg"))
+        assertTrue(MediaExport.moveUriToCamera(app, uri, "IMG_MOVE_TWICE.jpg"))
+
+        resolver.query(uri, arrayOf(
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.RELATIVE_PATH
+        ), null, null, null)?.use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("IMG_MOVE_TWICE.jpg", cursor.getString(0))
+            assertEquals("DCIM/Camera", cursor.getString(1))
+        }
+        assertEquals(1, countIn("DCIM/Camera", "IMG_MOVE_TWICE.jpg"))
+    }
+
+    @Test
     fun uniqueCameraNameSeesLowercasePathRows() {
         // 模拟 vivo 相机行：小写 relative_path 下的同名文件
         putMedia("DCIM/camera", "IMG_CASE.jpg", byteArrayOf(1))

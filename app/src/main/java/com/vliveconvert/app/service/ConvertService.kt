@@ -609,6 +609,12 @@ class ConvertService : Service() {
      * @return 实际结果（批次日志据此如实记录；未确认路径 deleted=0 不是失败）
      */
     private suspend fun handleDeleteOriginals(baseStatus: String, finalizeInBar: Boolean): DeleteOutcome {
+        if (!ConvertCenter.persistPendingOperations(applicationContext)) {
+            withContext(Dispatchers.Main) {
+                ConvertCenter.statusText = "$baseStatus；无法保存删除/落地进度，已停止后续删除"
+            }
+            return DeleteOutcome(0, 0, false)
+        }
         val all = synchronized(ConvertCenter.pendingTrashUris) {
             ConvertCenter.pendingTrashUris.distinct().toList()
         }
@@ -629,8 +635,10 @@ class ConvertService : Service() {
             }
         }
         if (valid.isEmpty()) {
+            ConvertCenter.persistPendingOperations(applicationContext)
             withContext(Dispatchers.Main) {
                 ConvertCenter.statusText = "$baseStatus；原图删除失败（无法访问原文件）"
+                ConvertCenter.signalPendingResume()
             }
             return DeleteOutcome(0, 0, false)
         }
@@ -676,45 +684,63 @@ class ConvertService : Service() {
      * @return 成功移入的条数
      */
     private suspend fun finalizePendingMoves(progressInBar: Boolean): Int {
-        val entries = synchronized(ConvertCenter.pendingFinalize) {
-            ConvertCenter.pendingFinalize.toList()
-        }
-        ConvertCenter.pendingFinalize.clear()
-        if (entries.isEmpty()) return 0
-        if (progressInBar) {
-            withContext(Dispatchers.Main) {
-                ConvertCenter.progress = finalizeProgressValue(0, entries.size)
-                ConvertCenter.progressDetail = "移入相机相册 0/${entries.size}"
+        if (ConvertCenter.isFinalizing) return 0
+        withContext(Dispatchers.Main) { ConvertCenter.isFinalizing = true }
+        return try {
+            val entries = synchronized(ConvertCenter.pendingFinalize) {
+                ConvertCenter.pendingFinalize.toList()
             }
-            notifyFinalize(0, entries.size)
-        }
-        var moved = 0
-        var finished = 0
-        for (e in entries) {
-            val okMove = MediaExport.moveUriToCamera(this, e.uri, e.originalName)
-            if (okMove) moved++
-            finished++
+            if (entries.isEmpty()) {
+                ConvertCenter.clearPendingOperations(applicationContext)
+                return 0
+            }
             if (progressInBar) {
                 withContext(Dispatchers.Main) {
-                    ConvertCenter.progress = finalizeProgressValue(finished, entries.size)
-                    ConvertCenter.progressDetail = "移入相机相册 $finished/${entries.size}"
+                    ConvertCenter.progress = finalizeProgressValue(0, entries.size)
+                    ConvertCenter.progressDetail = "移入相机相册 0/${entries.size}"
                 }
-                notifyFinalize(finished, entries.size)
+                notifyFinalize(0, entries.size)
             }
-            // 回写单项状态（无论成败都给用户明确结果）
-            withContext(Dispatchers.Main) {
-                val idx = ConvertCenter.items.indexOfFirst { it.item.key == e.itemKey }
-                if (idx >= 0) {
-                    val ci = ConvertCenter.items[idx]
-                    ConvertCenter.items[idx] = ci.copy(
-                        status = if (okMove) "完成：已以原名移入相机相册"
-                                 else "完成：原名移入失败，文件保留在输出目录"
-                    )
+            var moved = 0
+            var finished = 0
+            var checkpointFailed = false
+            for (e in entries) {
+                val okMove = MediaExport.moveUriToCamera(
+                    this, e.uri, e.originalName, allowCopyFallback = false)
+                if (okMove) moved++
+                finished++
+                if (progressInBar) {
+                    withContext(Dispatchers.Main) {
+                        ConvertCenter.progress = finalizeProgressValue(finished, entries.size)
+                        ConvertCenter.progressDetail = "移入相机相册 $finished/${entries.size}"
+                    }
+                    notifyFinalize(finished, entries.size)
+                }
+                withContext(Dispatchers.Main) {
+                    val idx = ConvertCenter.items.indexOfFirst { it.item.key == e.itemKey }
+                    if (idx >= 0) {
+                        val ci = ConvertCenter.items[idx]
+                        ConvertCenter.items[idx] = ci.copy(
+                            status = if (okMove) "完成：已以原名移入相机相册"
+                                     else "完成：原名移入失败，文件保留在输出目录"
+                        )
+                    }
+                }
+                if (!ConvertCenter.checkpointPendingFinalize(applicationContext, e.itemKey)) {
+                    checkpointFailed = true
                 }
             }
+            if (!checkpointFailed) ConvertCenter.clearPendingOperations(applicationContext)
+            if (checkpointFailed) {
+                withContext(Dispatchers.Main) {
+                    ConvertCenter.statusText = ConvertCenter.statusText + "；部分进度保存失败，已保留恢复项"
+                }
+            }
+            persistQueueSnapshot()
+            moved
+        } finally {
+            withContext(NonCancellable + Dispatchers.Main) { ConvertCenter.isFinalizing = false }
         }
-        persistQueueSnapshot()
-        return moved
     }
 
     /** 主线程取队列快照 → IO 写文件（绝不直接迭代 Compose 列表） */

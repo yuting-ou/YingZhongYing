@@ -24,6 +24,8 @@ import java.util.Collections
  *   严禁在 IO 线程直接迭代 [items]——曾与主线程写并发导致转换中闪退；
  * - JSON 编解码只走 [QueueJson] 纯函数（普通 List 进出）。
  */
+internal enum class PendingResumeAction { DELETE, FINALIZE, NONE }
+
 object ConvertCenter {
 
     /** 本进程启动时刻：残留清理的判据必须锚定**进程**。Activity 旋转/重建不换进程，
@@ -36,6 +38,7 @@ object ConvertCenter {
     val items = mutableStateListOf<ConvertItem>()
 
     var isConverting by mutableStateOf(false)
+    var isFinalizing by mutableStateOf(false)
     var progress by mutableFloatStateOf(0f)
     var progressDetail by mutableStateOf("")
     /**
@@ -80,6 +83,7 @@ object ConvertCenter {
      * Activity 通过观察此值变化拉起回收站确认弹窗。
      */
     var pendingTrashCount by mutableIntStateOf(0)
+    var pendingResumeTick by mutableIntStateOf(0)
 
     /**
      * 待落地条目：「移到相机相册 + 转换后删除原图」同时开启时，
@@ -110,10 +114,81 @@ object ConvertCenter {
             }
         }
         synchronized(pendingFinalize) { pendingFinalize.clear() }
+        clearPendingOperations(context)
         if (rewritten > 0) persistQueue(context, itemsSnapshot())
     }
 
     private const val QUEUE_FILE = "convert_queue.json"
+
+    internal fun pendingSnapshot(): PendingSnapshot = PendingSnapshot(
+        trashUris = synchronized(pendingTrashUris) {
+            pendingTrashUris.map { it.toString() }.distinct()
+        },
+        finalize = synchronized(pendingFinalize) {
+            pendingFinalize.map {
+                PendingFinalizeEntry(it.uri.toString(), it.originalName, it.itemKey)
+            }.distinctBy { it.itemKey }
+        }
+    )
+
+    fun persistPendingOperations(context: Context): Boolean =
+        PendingOperationsStore(context).save(::pendingSnapshot)
+
+    internal fun pendingResumeAction(): PendingResumeAction = when {
+        synchronized(pendingTrashUris) { pendingTrashUris.isNotEmpty() } -> PendingResumeAction.DELETE
+        synchronized(pendingFinalize) { pendingFinalize.isNotEmpty() } -> PendingResumeAction.FINALIZE
+        else -> PendingResumeAction.NONE
+    }
+
+    suspend fun restorePendingOperations(context: Context, restoreTrash: Boolean = true): Int {
+        val snapshot = withContext(Dispatchers.IO) { PendingOperationsStore(context).load() }
+        if (snapshot.trashUris.isEmpty() && snapshot.finalize.isEmpty()) return 0
+        return withContext(Dispatchers.Main) {
+            val trash = if (restoreTrash) snapshot.trashUris.mapNotNull { text ->
+                try { Uri.parse(text) } catch (_: Exception) { null }
+            }.distinctBy { it.toString() } else emptyList()
+            val finalize = snapshot.finalize.mapNotNull { entry ->
+                if (entry.uri.isBlank() || entry.originalName.isBlank() || entry.itemKey.isBlank()) {
+                    null
+                } else {
+                    try {
+                        FinalizeEntry(Uri.parse(entry.uri), entry.originalName, entry.itemKey)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }.distinctBy { it.itemKey }
+            if (trash.isNotEmpty()) {
+                val known = synchronized(pendingTrashUris) { pendingTrashUris.map { it.toString() }.toSet() }
+                val missing = trash.filter { it.toString() !in known }
+                synchronized(pendingTrashUris) { pendingTrashUris.addAll(missing) }
+                pendingTrashCount = synchronized(pendingTrashUris) { pendingTrashUris.size }
+            }
+            if (finalize.isNotEmpty()) {
+                val known = synchronized(pendingFinalize) { pendingFinalize.map { it.itemKey }.toSet() }
+                val missing = finalize.filter { it.itemKey !in known }
+                synchronized(pendingFinalize) { pendingFinalize.addAll(missing) }
+            }
+            trash.size
+        }
+    }
+
+    fun checkpointPendingFinalize(context: Context, itemKey: String): Boolean {
+        val saved = PendingOperationsStore(context).save {
+            val current = pendingSnapshot()
+            current.copy(finalize = current.finalize.filterNot { it.itemKey == itemKey })
+        }
+        if (!saved) return false
+        synchronized(pendingFinalize) { pendingFinalize.removeAll { it.itemKey == itemKey } }
+        return true
+    }
+
+    fun clearPendingOperations(context: Context): Boolean =
+        PendingOperationsStore(context).clear()
+
+    fun signalPendingResume() {
+        pendingResumeTick++
+    }
 
     /** 主线程调用：队列的不可变快照（IO 线程的遍历/持久化只能用它） */
     fun itemsSnapshot(): List<ConvertItem> = items.toList()
@@ -174,7 +249,7 @@ object ConvertCenter {
 
     /** 开始转换：持久化队列快照并启动前台服务执行批次（主线程调用） */
     fun start(context: Context): Boolean {
-        if (isConverting) return false
+        if (isConverting || isFinalizing) return false
         val targets = items.filter { !it.done && !it.failed }
         if (targets.isEmpty()) {
             statusText = "没有待转换的照片"
@@ -216,7 +291,7 @@ object ConvertCenter {
      * @return 实际进入重转的条数（0 = 无可重转项）
      */
     fun beginReconvert(context: Context, targets: List<ConvertItem>): Int {
-        if (isConverting) return 0
+        if (isConverting || isFinalizing) return 0
         if (targets.isEmpty()) return 0
         // 重置目标条目：保留 outUri（覆盖旧产物用），清 done/failed，标记重转模式
         targets.forEach { t ->
@@ -290,7 +365,10 @@ object ConvertCenter {
 internal fun mergeRestored(
     parsed: List<ConvertItem>,
     current: List<ConvertItem>
-): List<ConvertItem> = current + parsed.filter { p -> current.none { it.item.id == p.item.id } }
+): List<ConvertItem> {
+    val currentIds = current.mapTo(HashSet<Long>()) { it.item.id }
+    return current + parsed.filter { it.item.id !in currentIds }
+}
 
 /**
  * 「清空」撤销时的合并（纯函数，可 JVM 单测）：
@@ -300,4 +378,7 @@ internal fun mergeRestored(
 internal fun mergeClearedUndo(
     cleared: List<ConvertItem>,
     current: List<ConvertItem>
-): List<ConvertItem> = cleared.filter { c -> current.none { it.item.id == c.item.id } } + current
+): List<ConvertItem> {
+    val currentIds = current.mapTo(HashSet<Long>()) { it.item.id }
+    return cleared.filter { it.item.id !in currentIds } + current
+}

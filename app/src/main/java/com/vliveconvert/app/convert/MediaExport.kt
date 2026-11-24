@@ -604,8 +604,28 @@ internal object MediaExport {
      * @param preferredName 期望的文件名：无同名冲突时直接用（原名落地）；
      *        DCIM/Camera 已有同名文件（真实冲突）时自动追加序号兜底
      */
-    fun moveUriToCamera(context: Context, uri: Uri, preferredName: String): Boolean {
+    fun moveUriToCamera(
+        context: Context,
+        uri: Uri,
+        preferredName: String,
+        allowCopyFallback: Boolean = true
+    ): Boolean {
         val resolver = context.contentResolver
+        val alreadyMoved = try {
+            resolver.query(
+                uri,
+                arrayOf(MediaStore.MediaColumns.RELATIVE_PATH),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                cursor.moveToFirst() && cursor.getString(0)
+                    .contains("DCIM/Camera", ignoreCase = true)
+            } == true
+        } catch (_: Exception) {
+            false
+        }
+        if (alreadyMoved) return true
         val newName = uniqueCameraName(resolver, preferredName)
         try {
             val rows = resolver.update(
@@ -618,6 +638,7 @@ internal object MediaExport {
             )
             if (rows > 0) return true
         } catch (_: Exception) {}
+        if (!allowCopyFallback) return false
         var newUri: Uri? = null
         return try {
             // 回退复制会新建行：坐标从**文件字节**直接解析（EXIF→XMP→视频段）。

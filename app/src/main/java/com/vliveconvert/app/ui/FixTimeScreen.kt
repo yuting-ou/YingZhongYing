@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -105,6 +106,9 @@ fun FixTimeScreen(
     var currentBucketId by remember(albums) { mutableStateOf(albums.firstOrNull()?.bucketId) }
     val bucketId = currentBucketId
     val selected = remember { mutableStateListOf<MediaItem>() }
+    val selectedIds by remember(selected) {
+        derivedStateOf { selected.mapTo(HashSet<Long>()) { it.id } }
+    }
     val gridState = rememberLazyGridState()
 
     // 修复完成后清空选择
@@ -152,12 +156,12 @@ fun FixTimeScreen(
         if (idx >= 0) selected.removeAt(idx) else selected.add(item)
     }
     val toggleGroup: (List<MediaItem>) -> Unit = { group ->
-        val ids = group.map { it.id }.toSet()
-        val allIn = group.isNotEmpty() && group.all { g -> selected.any { it.id == g.id } }
+        val ids = group.mapTo(HashSet<Long>()) { it.id }
+        val allIn = group.isNotEmpty() && group.all { it.id in selectedIds }
         if (allIn) {
             selected.removeAll { it.id in ids }
         } else {
-            for (g in group) if (selected.none { it.id == g.id }) selected.add(g)
+            selected.addAll(group.filter { it.id !in selectedIds })
         }
     }
 
@@ -231,8 +235,8 @@ fun FixTimeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.weight(1f))
-            val allSel = n > 0 && displayOrder.all { g -> selected.any { it.id == g.id } }
-            val someSel = displayOrder.any { g -> selected.any { it.id == g.id } }
+            val allSel = n > 0 && displayOrder.all { it.id in selectedIds }
+            val someSel = displayOrder.any { it.id in selectedIds }
             Row(
                 Modifier
                     .clip(continuousShape(8.dp))
@@ -294,8 +298,8 @@ fun FixTimeScreen(
                 ) {
                     for ((dk, groupItems) in gridGroups) {
                         stickyHeader(key = "hdr_$dk") {
-                            val allSel = groupItems.all { g -> selected.any { it.id == g.id } }
-                            val someSel = groupItems.any { g -> selected.any { it.id == g.id } }
+                            val allSel = groupItems.all { it.id in selectedIds }
+                            val someSel = groupItems.any { it.id in selectedIds }
                             Box(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp)) {
                                 Row(
                                     Modifier

@@ -27,6 +27,7 @@ class SingleLiveScanner(private val repo: MediaRepo) {
 
     class ScanState {
         val results = mutableStateListOf<MediaItem>()
+        val resultIds = HashSet<Long>()
         val known = ConcurrentHashMap<String, MediaItem>()
         val pending = ConcurrentLinkedQueue<MediaItem>()
         val scanned = ConcurrentHashMap.newKeySet<String>()
@@ -38,6 +39,7 @@ class SingleLiveScanner(private val repo: MediaRepo) {
 
         fun resetProgress() {
             results.clear()
+            resultIds.clear()
             known.clear()
             pending.clear()
             scanned.clear()
@@ -99,9 +101,7 @@ class SingleLiveScanner(private val repo: MediaRepo) {
             if (!st.known.containsKey(item.key)) continue
             if (shouldInclude(item)) {
                 withContext(Dispatchers.Main) {
-                    if (st.known.containsKey(item.key) &&
-                        st.results.none { it.id == item.id }
-                    ) {
+                    if (st.known.containsKey(item.key) && st.resultIds.add(item.id)) {
                         st.results.add(item)
                     }
                 }
