@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -31,13 +32,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.shadow.Shadow
 import com.vliveconvert.app.service.PerfPreset
 
+// 小尺寸折射节点在部分 GPU/驱动会触发 RenderThread SIGSEGV；这里固定使用玻璃膜，不挂 Backdrop。
 internal fun presetTextColor(
     selection: Float,
     base: Color,
@@ -97,9 +94,7 @@ private fun GlassPresetChip(
         else spring(dampingRatio = 0.72f, stiffness = 620f),
         label = "presetPress"
     )
-    val backdrop = LocalGlassBackdrop.current
     val dark = isDarkGlass()
-    val (blurScale, lensScale, chromaticOn) = glassOptics()
     val shape = continuousShape(24.dp)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
     val primary = MaterialTheme.colorScheme.primary
@@ -113,75 +108,32 @@ private fun GlassPresetChip(
 
     val visual = modifier
         .height(48.dp)
+        .shadow(
+            10.dp,
+            shape,
+            clip = false,
+            ambientColor = Color.Black.copy(alpha = if (dark) 0.22f else 0.08f),
+            spotColor = Color.Black.copy(alpha = if (dark) 0.18f else 0.06f)
+        )
+        .clip(shape)
+
+    val container = visual
         .graphicsLayer {
             scaleX = pressScale
             scaleY = pressScale
         }
-        .clip(shape)
-
-    val container = if (backdrop != null && hazeAvailable()) {
-        visual.drawBackdrop(
-            backdrop = backdrop,
-            shape = { shape },
-            effects = {
-                blur(14.dp.toPx() * blurScale)
-                if (lensScale > 0f) {
-                    lens(
-                        refractionHeight = (18f + 8f * selection).dp.toPx() * lensScale,
-                        refractionAmount = (30f + 14f * selection).dp.toPx() * lensScale,
-                        depthEffect = true,
-                        chromaticAberration = chromaticOn
-                    )
-                }
-            },
-            highlight = {
-                Highlight.Default.copy(
-                    width = 1.1.dp,
-                    alpha = if (dark) 0.46f + 0.22f * selection else 0.56f + 0.24f * selection
+        .background(base.copy(alpha = if (dark) 0.78f else 0.68f))
+        .background(primary.copy(alpha = selection))
+        .border(
+            1.dp,
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (dark) 0.24f else 0.72f),
+                    Color.White.copy(alpha = if (dark) 0.06f else 0.20f)
                 )
-            },
-            shadow = {
-                Shadow(
-                    radius = 12.dp,
-                    color = Color.Black.copy(alpha = if (dark) 0.26f else 0.10f)
-                )
-            },
-            onDrawSurface = {
-                drawRect(base.copy(alpha = if (dark) 0.16f else 0.12f))
-                drawRect(
-                    Brush.verticalGradient(
-                        listOf(
-                            primary.copy(alpha = selection),
-                            primary.copy(alpha = selection)
-                        ),
-                        startY = 0f,
-                        endY = size.height
-                    )
-                )
-                drawRect(
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.22f), Color.Transparent),
-                        startY = 0f,
-                        endY = size.height * 0.6f
-                    )
-                )
-            }
+            ),
+            shape
         )
-    } else {
-        visual
-            .background(base.copy(alpha = if (dark) 0.78f else 0.68f))
-            .background(primary.copy(alpha = selection))
-            .border(
-                1.dp,
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = if (dark) 0.24f else 0.72f),
-                        Color.White.copy(alpha = if (dark) 0.06f else 0.20f)
-                    )
-                ),
-                shape
-            )
-    }
 
     Box(
         container

@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -49,12 +50,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.highlight.Highlight
-import com.kyant.backdrop.shadow.InnerShadow
-import com.kyant.backdrop.shadow.Shadow
 import kotlin.math.abs
 
 internal fun normalizedSliderProgress(
@@ -95,6 +90,7 @@ internal fun sliderVelocityStretch(velocityPxPerSecond: Float): Pair<Float, Floa
     return (1f + 0.10f * amount) to (1f - 0.06f * amount)
 }
 
+// 小尺寸折射节点在部分 GPU/驱动会触发 RenderThread SIGSEGV；这里固定使用玻璃膜，不挂 Backdrop。
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlassSlider(
@@ -251,91 +247,45 @@ private fun GlassSliderThumb(
     velocity: () -> Float
 ) {
     val reduceMotion = LocalReduceMotion.current
-    val backdrop = LocalGlassBackdrop.current
     val dark = isDarkGlass()
-    val (blurScale, lensScale, chromaticOn) = glassOptics()
     val shape = CircleShape
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
-    val modifier = Modifier
-        .size(28.dp)
-        .graphicsLayer {
-            val pressValue = press.value
-            val stretch = if (reduceMotion) 1f to 1f else sliderVelocityStretch(velocity())
-            val scale = if (enabled) 1f + 0.12f * pressValue else 0.92f
-            scaleX = scale * stretch.first
-            scaleY = scale * stretch.second
-            alpha = if (enabled) 1f else 0.38f
-        }
-
-    if (backdrop != null && hazeAvailable() && enabled) {
-        Box(
-            modifier.drawBackdrop(
-                backdrop = backdrop,
-                shape = { shape },
-                effects = {
-                    val p = press.value
-                    blur((10f - 4f * p).dp.toPx() * blurScale)
-                    if (lensScale > 0f) {
-                        lens(
-                            refractionHeight = (18f + 10f * p).dp.toPx() * lensScale,
-                            refractionAmount = (26f + 16f * p).dp.toPx() * lensScale,
-                            depthEffect = true,
-                            chromaticAberration = chromaticOn
-                        )
-                    }
-                },
-                highlight = {
-                    Highlight.Default.copy(
-                        width = 1.2.dp,
-                        alpha = if (dark) 0.62f else 0.78f
-                    )
-                },
-                shadow = {
-                    Shadow(
-                        radius = 10.dp,
-                        offset = androidx.compose.ui.unit.DpOffset(0.dp, 4.dp),
-                        color = Color.Black.copy(alpha = if (dark) 0.34f else 0.14f)
-                    )
-                },
-                innerShadow = {
-                    InnerShadow(
-                        radius = 6.dp,
-                        color = Color.Black.copy(alpha = 0.12f + 0.10f * press.value)
-                    )
-                },
-                onDrawSurface = {
-                    drawRect(base.copy(alpha = if (dark) 0.20f else 0.16f))
-                    drawRect(
-                        Brush.verticalGradient(
-                            listOf(Color.White.copy(alpha = 0.34f), Color.Transparent),
-                            startY = 0f,
-                            endY = size.height * 0.65f
-                        )
-                    )
-                }
+    Box(
+        Modifier
+            .size(28.dp)
+            .graphicsLayer {
+                val pressValue = press.value
+                val stretch = if (reduceMotion) 1f to 1f else sliderVelocityStretch(velocity())
+                val scale = if (enabled) 1f + 0.12f * pressValue else 0.92f
+                scaleX = scale * stretch.first
+                scaleY = scale * stretch.second
+                alpha = if (enabled) 1f else 0.38f
+            }
+            .shadow(
+                8.dp,
+                shape,
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = if (dark) 0.26f else 0.10f),
+                spotColor = Color.Black.copy(alpha = if (dark) 0.20f else 0.08f)
             )
-        )
-    } else {
-        Box(
-            modifier
-                .clip(shape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            base.copy(alpha = if (dark) 0.82f else 0.74f),
-                            base.copy(alpha = if (dark) 0.58f else 0.42f)
-                        )
+            .clip(shape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = if (dark) 0.30f else 0.58f),
+                        base.copy(alpha = if (dark) 0.88f else 0.76f),
+                        base.copy(alpha = if (dark) 0.62f else 0.48f)
                     )
                 )
-                .border(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0.18f))
-                    ),
-                    shape
-                )
-        )
-    }
+            )
+            .border(
+                1.dp,
+                Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.88f), Color.White.copy(alpha = 0.16f))
+                ),
+                shape
+            )
+    )
 }
 
 @Composable

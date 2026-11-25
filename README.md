@@ -7,10 +7,14 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test1) ——
-> 点开 `VivoLivePhoto-v3.0.0-test1.apk` 即可安装（**3.0 首个测试版** · 液态玻璃滑块 +
-> 液态预设胶囊 + 拖动值气泡 + 物理动效；可从 2.8.0 正式版覆盖安装，数据保留）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test1/VivoLivePhoto-v3.0.0-test1.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test2) ——
+> 点开 `VivoLivePhoto-v3.0.0-test2.apk` 即可安装（**3.0 热修测试版** · 修复齿轮闪退；
+> 液态玻璃滑块 + 预设胶囊 + 拖动值气泡 + 物理动效；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test2/VivoLivePhoto-v3.0.0-test2.apk) 下载，内容一致。
+>
+> **v3.0.0-test2**：修复 test1 真机点击设置齿轮的 RenderThread 闪退——小尺寸 Backdrop
+> 节点在部分 GPU/驱动不安全，滑块与预设改为稳定多层玻璃膜；交互、动效与语义全部保留。
+> **请勿安装 test1。**
 >
 > **v3.0.0-test1（Liquid Controls）**：性能页四个自定义滑块升级为玻璃轨道、折射拇指、
 > 刻度与镜面高光；预设改为液态分段胶囊；支持按压透镜、速度形变、弹簧回弹与拖动值气泡。
@@ -203,6 +207,11 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test2（热修 · 齿轮闪退）
+
+- 小尺寸 Backdrop 折射节点在部分 GPU/驱动触发 RenderThread `SIGSEGV`；滑块与预设改为稳定多层玻璃膜，保留全部交互与动效。
+- 无头模拟器恢复验证设置齿轮、手动挡、预设与滑块，不再崩溃。
 
 ### v3.0.0-test1（Liquid Controls · 液态控件）
 
