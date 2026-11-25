@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -914,11 +915,19 @@ fun GlassIconTile(
 ) {
     val dark = isDarkGlass()
     val interaction = remember { MutableInteractionSource() }
-    val scale by rememberPressScale(interaction, pressedScale = 0.92f)
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by rememberPressScale(interaction, pressedScale = 1.06f)
+    val dispersion = animateGlassDispersion(pressed)
+    val touch = rememberGlassPressPosition(
+        interactionSource = interaction,
+        targetSize = 48.dp.coerceAtLeast(size),
+        visualSize = size
+    )
     // 圆角并入全局体系：磁贴 = min(12dp, 34%)，与缩略图(12dp)同心于 24dp 卡片；
     // cornerFraction >= 0.5 表示显式要圆（播放角标等圆形语义）
-    val shape = if (cornerFraction >= 0.5f) CircleShape
-                else continuousShape(minOf(12.dp, size * cornerFraction))
+    val tileRadius = if (cornerFraction >= 0.5f) size / 2f
+                     else minOf(12.dp, size * cornerFraction)
+    val shape = if (cornerFraction >= 0.5f) CircleShape else continuousShape(tileRadius)
     val top = if (tint != null) tint.copy(alpha = if (dark) 0.34f else 0.26f)
               else Color.White.copy(alpha = if (dark) 0.16f else 0.72f)
     val bottom = if (tint != null) tint.copy(alpha = if (dark) 0.12f else 0.08f)
@@ -937,6 +946,12 @@ fun GlassIconTile(
         .clip(shape)
         .background(Brush.verticalGradient(listOf(top, bottom)))
         .border(1.dp, Brush.verticalGradient(listOf(edgeTop, edgeBottom)), shape)
+        .glassPressDispersion(
+            intensity = dispersion,
+            radius = tileRadius,
+            dark = dark,
+            touch = touch
+        )
     // 外层占位 = 视觉尺寸（布局不因热区扩张而移动）；点击命中走居中的 48dp
     // 透明代理，溢出部分仍可命中（祖先无 clip）。按压缩放经同一 interactionSource。
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
@@ -1019,7 +1034,10 @@ fun GlossyButton(
     val top = lerp(primary, Color.White, 0.18f)
     val bottom = lerp(primary, Color.Black, 0.12f)
     val interaction = remember { MutableInteractionSource() }
-    val scale by rememberPressScale(interaction, pressedScale = 0.975f)
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by rememberPressScale(interaction, pressedScale = 1.015f)
+    val dispersion = animateGlassDispersion(pressed)
+    val touch = rememberGlassPressPosition(interaction)
     Box(
         modifier
             .fillMaxWidth()
@@ -1035,6 +1053,13 @@ fun GlossyButton(
             .background(Brush.verticalGradient(listOf(top, bottom)))
             .border(1.dp, Brush.verticalGradient(
                 listOf(Color.White.copy(alpha = 0.85f), Color.White.copy(alpha = 0.18f))), CircleShape)
+            .glassPressDispersion(
+                intensity = dispersion,
+                radius = 27.dp,
+                dark = isDarkGlass(),
+                touch = touch,
+                strength = 0.55f
+            )
             .clickable(interactionSource = interaction, indication = LocalIndication.current) { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1054,7 +1079,10 @@ fun GlassOutlineButton(
     modifier: Modifier = Modifier
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val scale by rememberPressScale(interaction, pressedScale = 0.975f)
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by rememberPressScale(interaction, pressedScale = 1.015f)
+    val dispersion = animateGlassDispersion(pressed)
+    val touch = rememberGlassPressPosition(interaction)
     Box(
         modifier
             .fillMaxWidth()
@@ -1066,6 +1094,13 @@ fun GlassOutlineButton(
             .clip(CircleShape)
             .background(color.copy(alpha = 0.10f))
             .border(1.dp, color.copy(alpha = 0.28f), CircleShape)
+            .glassPressDispersion(
+                intensity = dispersion,
+                radius = 24.dp,
+                dark = isDarkGlass(),
+                touch = touch,
+                strength = 0.8f
+            )
             .clickable(interactionSource = interaction, indication = LocalIndication.current) { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -1108,13 +1143,29 @@ fun GlassPill(
     onClick: (() -> Unit)? = null,
     content: @Composable RowScope.() -> Unit
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by rememberPressScale(interaction, pressedScale = 1.03f)
+    val dispersion = animateGlassDispersion(onClick != null && pressed)
+    val touch = rememberGlassPressPosition(interaction)
     val base = modifier
         .height(34.dp)
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
         .glassSurface(radius = 17.dp)
+        .glassPressDispersion(
+            intensity = dispersion,
+            radius = 17.dp,
+            dark = isDarkGlass(),
+            touch = touch,
+            strength = 0.8f
+        )
     Box(
         if (onClick != null) {
             base.clickable(onClick = onClick, indication = LocalIndication.current,
-                interactionSource = remember { MutableInteractionSource() })
+                interactionSource = interaction)
         } else base,
         contentAlignment = Alignment.Center
     ) {

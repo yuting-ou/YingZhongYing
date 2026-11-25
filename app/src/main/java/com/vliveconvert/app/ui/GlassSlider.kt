@@ -122,6 +122,7 @@ fun GlassSlider(
         else spring(dampingRatio = 0.72f, stiffness = 520f),
         label = "glassSliderPress"
     )
+    val dispersion = animateGlassDispersion(enabled && (pressed || dragged))
     var velocity by remember { mutableFloatStateOf(0f) }
     val velocityTracker = remember { VelocityTracker() }
     LaunchedEffect(dragged, reduceMotion) {
@@ -192,6 +193,7 @@ fun GlassSlider(
                 GlassSliderThumb(
                     enabled = enabled,
                     press = press,
+                    dispersion = dispersion,
                     velocity = { velocity }
                 )
             },
@@ -244,6 +246,7 @@ fun GlassSlider(
 private fun GlassSliderThumb(
     enabled: Boolean,
     press: androidx.compose.runtime.State<Float>,
+    dispersion: Float,
     velocity: () -> Float
 ) {
     val reduceMotion = LocalReduceMotion.current
@@ -256,7 +259,7 @@ private fun GlassSliderThumb(
             .graphicsLayer {
                 val pressValue = press.value
                 val stretch = if (reduceMotion) 1f to 1f else sliderVelocityStretch(velocity())
-                val scale = if (enabled) 1f + 0.12f * pressValue else 0.92f
+                val scale = if (enabled) 1f + 0.18f * pressValue else 0.92f
                 scaleX = scale * stretch.first
                 scaleY = scale * stretch.second
                 alpha = if (enabled) 1f else 0.38f
@@ -284,6 +287,12 @@ private fun GlassSliderThumb(
                     listOf(Color.White.copy(alpha = 0.88f), Color.White.copy(alpha = 0.16f))
                 ),
                 shape
+            )
+            .glassPressDispersion(
+                intensity = dispersion,
+                radius = 14.dp,
+                dark = dark,
+                strength = if (enabled) 1f else 0f
             )
     )
 }

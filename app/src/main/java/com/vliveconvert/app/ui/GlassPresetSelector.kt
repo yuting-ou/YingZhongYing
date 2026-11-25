@@ -89,11 +89,13 @@ private fun GlassPresetChip(
         label = "presetSelection"
     )
     val pressScale by animateFloatAsState(
-        targetValue = if (pressed) 0.96f else 1f,
+        targetValue = if (pressed) 1.04f else 1f,
         animationSpec = if (reduceMotion) androidx.compose.animation.core.snap()
         else spring(dampingRatio = 0.72f, stiffness = 620f),
         label = "presetPress"
     )
+    val dispersion = animateGlassDispersion(pressed)
+    val touch = rememberGlassPressPosition(interaction)
     val dark = isDarkGlass()
     val shape = continuousShape(24.dp)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
@@ -133,6 +135,13 @@ private fun GlassPresetChip(
                 )
             ),
             shape
+        )
+        .glassPressDispersion(
+            intensity = dispersion,
+            radius = 24.dp,
+            dark = dark || selected,
+            touch = touch,
+            strength = 0.9f
         )
 
     Box(

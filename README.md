@@ -7,14 +7,17 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test2) ——
-> 点开 `VivoLivePhoto-v3.0.0-test2.apk` 即可安装（**3.0 热修测试版** · 修复齿轮闪退；
-> 液态玻璃滑块 + 预设胶囊 + 拖动值气泡 + 物理动效；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test2/VivoLivePhoto-v3.0.0-test2.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test3) ——
+> 点开 `VivoLivePhoto-v3.0.0-test3.apk` 即可安装（**3.0 液态按压测试版** · 按下鼓起 +
+> 触点高光跟手 + 边缘色散；滑块、预设胶囊、齿轮与按钮统一手感；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test3/VivoLivePhoto-v3.0.0-test3.apk) 下载，内容一致。
+>
+> **v3.0.0-test3**：液态玻璃按压效果按 Kyant0/AndroidLiquidGlass 对齐——按下轻微膨胀、
+> 白色折射高光随指尖移动、上青蓝下玫橙的色散边缘；减少动效切静态。小控件继续走安全光谱膜，
+> 大卡片/Dock 保留真实 Backdrop 折射。**test1 闪退，请勿安装；test2 已被本版取代。**
 >
 > **v3.0.0-test2**：修复 test1 真机点击设置齿轮的 RenderThread 闪退——小尺寸 Backdrop
 > 节点在部分 GPU/驱动不安全，滑块与预设改为稳定多层玻璃膜；交互、动效与语义全部保留。
-> **请勿安装 test1。**
 >
 > **v3.0.0-test1（Liquid Controls）**：性能页四个自定义滑块升级为玻璃轨道、折射拇指、
 > 刻度与镜面高光；预设改为液态分段胶囊；支持按压透镜、速度形变、弹簧回弹与拖动值气泡。
@@ -207,6 +210,15 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test3（液态按压 · 鼓起与色散）
+
+- 按下不再缩小：预设胶囊、玻璃图标磁贴、次级按钮改为轻微膨胀，滑块拇指按压放大更明显。
+- 白色折射高光跟随指尖位置；图标磁贴把 48dp 触控代理坐标换算回视觉尺寸。
+- 上缘青蓝、下缘玫橙的色散边缘，叠加红青通道偏移；拖动滑块期间持续显示。
+- 减少动效：跳过弹簧与过冲，直接显示静态鼓起与色散。
+- 小控件继续使用纯 Canvas 光谱膜，避免小尺寸 Backdrop 的 RenderThread 闪退；大卡片/Dock 保留真实折射。
+- 测试基建改为每个测试类独立 JVM，消除 Robolectric 原生加载竞态带来的 test-retry 假绿。
 
 ### v3.0.0-test2（热修 · 齿轮闪退）
 

@@ -22,8 +22,8 @@ android {
         applicationId = "com.yutingou.yingzhongying"
         minSdk = 34
         targetSdk = 37
-        versionCode = 136
-        versionName = "3.0.0-test2"
+        versionCode = 137
+        versionName = "3.0.0-test3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 只打 arm64（vivo 真机）与 x86_64（模拟器），减少 so 体积（对齐 ZLivePhoto）
@@ -146,7 +146,11 @@ tasks.withType<Test>().configureEach {
     // 对策是「定期换 JVM」而不是「把堆开得更大」：本机内存吃紧，大堆会直接触发换页，
     // 实测 3G 堆时整套从 2 分钟劣化到 13 分钟没跑完一个测试类。
     maxHeapSize = "1024m"
-    forkEvery = 3
+    // 每个测试类独立 JVM：同一 JVM 里两个 @GraphicsMode(NATIVE) 类会各自创建
+    // Robolectric sandbox，第二次加载 native runtime 时 fonts jar 的 zipfs 仍被
+    // 前一个 sandbox 持有，触发 FileSystemAlreadyExistsException 并污染整个 JVM。
+    // 代价是启动开销增加；比 test-retry 留下的“假绿”可靠。
+    forkEvery = 1
     retry {
         maxRetries.set(1)
         failOnPassedAfterRetry.set(false)
