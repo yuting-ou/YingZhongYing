@@ -22,8 +22,8 @@ android {
         applicationId = "com.yutingou.yingzhongying"
         minSdk = 34
         targetSdk = 37
-        versionCode = 137
-        versionName = "3.0.0-test3"
+        versionCode = 138
+        versionName = "3.0.0-test4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 只打 arm64（vivo 真机）与 x86_64（模拟器），减少 so 体积（对齐 ZLivePhoto）
@@ -188,13 +188,14 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation("androidx.exifinterface:exifinterface:1.3.7")
-    // 真实背景采样模糊（液态玻璃）：GitHub chrisbanes/haze，Apache-2.0。
-    // 1.6.10 用 Kotlin 2.1/Compose 1.8 构建，与本项目 Kotlin 2.2.10 兼容
-    implementation("dev.chrisbanes.haze:haze:1.6.10")
+    // 真实背景采样模糊/折射（液态玻璃）：GitHub chrisbanes/haze，Apache-2.0。
+    implementation("dev.chrisbanes.haze:haze:2.1.0")
+    implementation("dev.chrisbanes.haze:haze-blur:2.1.0")
+    implementation("dev.chrisbanes.haze:haze-glass:2.1.0")
     // 液态玻璃折射/色散/高光：GitHub Kyant0/AndroidLiquidGlass，Apache-2.0。
     // 1.0.6 面向 Kotlin 2.3/Compose 1.10.3：metadata 2.3 可被本项目 2.2.10 读取（n+1），
     // 公开 API 与 1.0.2 完全一致；得「绘制不更新」修复与 Shapes 圆角采样支持。
-    // 2.0.1 需 Kotlin 2.4 metadata + Compose 1.12，属工具链 overhaul，不在此版。
+    // 2.1.0 需 Kotlin 2.4 metadata + Compose 1.12，属工具链 overhaul，不在此版。
     implementation("io.github.kyant0:backdrop:1.0.6")
     // 苹果连续曲率圆角（squircle）：backdrop 传递依赖同版本，但传递 impl 不暴露到编译
     // 类路径，显式声明以供 continuousShape() 引用（Gradle 去重，不会与 backdrop 重复打包）

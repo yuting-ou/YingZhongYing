@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,8 +34,11 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.service.PerfPreset
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.hazeGlass
 
-// 小尺寸折射节点在部分 GPU/驱动会触发 RenderThread SIGSEGV；这里固定使用玻璃膜，不挂 Backdrop。
+// 小尺寸节点不挂 Backdrop；有 Haze Glass 时采样真实背景，无 GPU/失效时回退玻璃膜。
 internal fun presetTextColor(
     selection: Float,
     base: Color,
@@ -100,6 +104,14 @@ private fun GlassPresetChip(
     val shape = continuousShape(24.dp)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
     val primary = MaterialTheme.colorScheme.primary
+    val haze = LocalGlassHazeState.current
+    val hazeOn = haze != null && hazeAvailable()
+    val glassStyle = remember(dark, selected, base, primary) {
+        GlassStyle.regular.then {
+            shape(RoundedCornerShape(24.dp))
+            tint(if (selected) primary.copy(alpha = 0.16f) else base.copy(alpha = 0.08f))
+        }
+    }
     val textColor = presetTextColor(
         selection = selection,
         base = base,
@@ -124,8 +136,19 @@ private fun GlassPresetChip(
             scaleX = pressScale
             scaleY = pressScale
         }
-        .background(base.copy(alpha = if (dark) 0.78f else 0.68f))
-        .background(primary.copy(alpha = selection))
+        .then(
+            if (hazeOn) {
+                Modifier.hazeGlass(
+                    input = HazeInput.Sources(haze!!),
+                    style = glassStyle,
+                    interactionSource = null
+                )
+            } else {
+                Modifier
+            }
+        )
+        .background(base.copy(alpha = if (hazeOn) 0.20f else if (dark) 0.78f else 0.68f))
+        .background(primary.copy(alpha = selection * if (hazeOn) 0.86f else 1f))
         .border(
             1.dp,
             Brush.verticalGradient(

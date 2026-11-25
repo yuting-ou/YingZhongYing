@@ -133,7 +133,10 @@ import com.vliveconvert.app.ui.LocationRecoveryScreen
 import com.vliveconvert.app.ui.GlassIndeterminateBar
 import com.vliveconvert.app.ui.GlassTextField
 import com.vliveconvert.app.ui.LocalGlassBackdrop
+import com.vliveconvert.app.ui.LocalGlassHazeState
 import com.vliveconvert.app.ui.LocalGlassQuality
+import com.vliveconvert.app.ui.glassHazeSource
+import com.vliveconvert.app.ui.glassWallpaper
 import com.vliveconvert.app.ui.LocalGlassSourceEnabled
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MainScreen
@@ -1013,12 +1016,15 @@ class MainActivity : ComponentActivity() {
                     firstFrameReady = true
                 }
                 val appHazeState = rememberGlassHazeState()
+                // 小尺寸 Glass 的采样源：只录壁纸，不把控件自身卷进去
+                val appSmallGlassHazeState = rememberGlassHazeState()
                 // 折射采样层：页面内容录进 GraphicsLayer，所有玻璃卡按自身位置取背景做 SDF 折射
                 val appGlassBackdrop = rememberLayerBackdrop()
                 // derivedStateOf：滑杆每 tick 都改 perf，但只有档位真变才失效玻璃子树
                 val glassQuality by remember { derivedStateOf { perf.glassQuality } }
                 CompositionLocalProvider(
                     LocalGlassBackdrop provides appGlassBackdrop,
+                    LocalGlassHazeState provides appSmallGlassHazeState,
                     LocalGlassQuality provides glassQuality
                 ) {
                 // 前台期间批次结束、攒下待确认删除的原图时立即拉起回收站弹窗
@@ -1189,6 +1195,8 @@ class MainActivity : ComponentActivity() {
                         }
                         .background(MaterialTheme.colorScheme.background)
                 ) {
+                    // 小尺寸 Glass 的独立采样层：壁纸只在后面录一次，控件不会被采进自己
+                    Box(Modifier.matchParentSize().glassWallpaper().glassHazeSource(appSmallGlassHazeState))
                     // 目标界面：授权后带权限状态一起参与重组，权限授予时也有过渡动画
                     val targetScreen = pickScreen(
                         hasReadPermission(),

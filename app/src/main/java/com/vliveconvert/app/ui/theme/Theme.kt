@@ -94,10 +94,11 @@ fun VLiveConvertTheme(
 ) {
     // 莫奈取色：用系统壁纸派生配色（Android 12+，minSdk 34 恒可用）。
     // 取色失败（影子环境/ROM 裁剪）回退品牌蓝，绝不让主题崩掉界面
+    val context = LocalContext.current
     val colorScheme = when {
         dynamicColor -> runCatching {
-            if (darkTheme) dynamicDarkColorScheme(LocalContext.current)
-            else dynamicLightColorScheme(LocalContext.current)
+            if (darkTheme) dynamicDarkColorScheme(context)
+            else dynamicLightColorScheme(context)
         }.getOrElse { if (darkTheme) DarkColorScheme else LightColorScheme }
         darkTheme -> DarkColorScheme
         else -> LightColorScheme

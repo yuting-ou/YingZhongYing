@@ -108,9 +108,13 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.hazeGlass
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
@@ -248,7 +252,7 @@ internal fun hazeAvailable(): Boolean =
 
 @Composable
 fun rememberGlassHazeState(): HazeState {
-    return rememberHazeState(blurEnabled = hazeAvailable())
+    return rememberHazeState()
 }
 
 /** 标记 Haze 的采样源（硬件加速时才真正记录图层） */
@@ -262,6 +266,9 @@ fun Modifier.glassHazeSource(state: HazeState): Modifier {
  * 页面内容录进一个 GraphicsLayer，玻璃卡按自己的位置取出背景并做 SDF 折射。
  */
 val LocalGlassBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
+
+/** 当前页 Haze 源；小尺寸 Glass 采样真实背景用 */
+internal val LocalGlassHazeState = staticCompositionLocalOf<HazeState?> { null }
 
 /**
  * 当前页是否把自己的内容注册成折射采样源。
@@ -381,12 +388,22 @@ fun HazeGlassCard(
     ) {
         if (hazeEnabled) {
             val (hazeBlurScale, _, _) = glassOptics()
-            Box(Modifier.matchParentSize().hazeEffect(hazeState) {
-                blurRadius = (if (dense) 40.dp else 24.dp) * hazeBlurScale
-                noiseFactor = 0.05f
-                tints = listOf(HazeTint(base.copy(alpha = if (dark) 0.20f else 0.06f)))
-                fallbackTint = HazeTint(base.copy(alpha = if (dark) 0.72f else 0.62f))
-            })
+            val blurStyle = remember(dark, dense, base, hazeBlurScale) {
+                HazeBlurStyle {
+                    blurRadius((if (dense) 40.dp else 24.dp) * hazeBlurScale)
+                    noiseFactor(0.05f)
+                    colorEffects(
+                        listOf(HazeColorEffect.tint(base.copy(alpha = if (dark) 0.20f else 0.06f)))
+                    )
+                    fallbackColorEffect(
+                        HazeColorEffect.tint(base.copy(alpha = if (dark) 0.72f else 0.62f))
+                    )
+                }
+            }
+            Box(Modifier.matchParentSize().hazeBlur(
+                input = HazeInput.Sources(hazeState),
+                style = blurStyle
+            ))
         }
         Box(Modifier.matchParentSize()
             .background(Brush.verticalGradient(listOf(fillTop, fillBottom))))
@@ -928,10 +945,19 @@ fun GlassIconTile(
     val tileRadius = if (cornerFraction >= 0.5f) size / 2f
                      else minOf(12.dp, size * cornerFraction)
     val shape = if (cornerFraction >= 0.5f) CircleShape else continuousShape(tileRadius)
-    val top = if (tint != null) tint.copy(alpha = if (dark) 0.34f else 0.26f)
-              else Color.White.copy(alpha = if (dark) 0.16f else 0.72f)
-    val bottom = if (tint != null) tint.copy(alpha = if (dark) 0.12f else 0.08f)
-                 else Color.White.copy(alpha = if (dark) 0.08f else 0.34f)
+    val haze = LocalGlassHazeState.current
+    val hazeOn = onClick != null && haze != null && hazeAvailable()
+    val glassStyle = remember(dark, tint, tileRadius) {
+        GlassStyle.regular.then {
+            shape(RoundedCornerShape(tileRadius))
+            tint((tint ?: Color.White).copy(alpha = 0.08f))
+        }
+    }
+    val glassAlpha = if (hazeOn) 0.52f else 1f
+    val top = if (tint != null) tint.copy(alpha = (if (dark) 0.34f else 0.26f) * glassAlpha)
+              else Color.White.copy(alpha = (if (dark) 0.16f else 0.72f) * glassAlpha)
+    val bottom = if (tint != null) tint.copy(alpha = (if (dark) 0.12f else 0.08f) * glassAlpha)
+                 else Color.White.copy(alpha = (if (dark) 0.08f else 0.34f) * glassAlpha)
     val edgeTop = Color.White.copy(alpha = if (dark) 0.28f else 0.95f)
     val edgeBottom = Color.White.copy(alpha = if (dark) 0.06f else 0.30f)
     val tile = Modifier
@@ -944,6 +970,17 @@ fun GlassIconTile(
             ambientColor = Color.Black.copy(alpha = 0.12f),
             spotColor = Color.Black.copy(alpha = 0.08f))
         .clip(shape)
+        .then(
+            if (hazeOn) {
+                Modifier.hazeGlass(
+                    input = HazeInput.Sources(haze!!),
+                    style = glassStyle,
+                    interactionSource = null
+                )
+            } else {
+                Modifier
+            }
+        )
         .background(Brush.verticalGradient(listOf(top, bottom)))
         .border(1.dp, Brush.verticalGradient(listOf(edgeTop, edgeBottom)), shape)
         .glassPressDispersion(

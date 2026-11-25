@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -50,6 +51,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.hazeGlass
 import kotlin.math.abs
 
 internal fun normalizedSliderProgress(
@@ -90,7 +94,7 @@ internal fun sliderVelocityStretch(velocityPxPerSecond: Float): Pair<Float, Floa
     return (1f + 0.10f * amount) to (1f - 0.06f * amount)
 }
 
-// 小尺寸折射节点在部分 GPU/驱动会触发 RenderThread SIGSEGV；这里固定使用玻璃膜，不挂 Backdrop。
+// 小尺寸节点不挂 Backdrop；有 Haze Glass 时采样真实背景，无 GPU/失效时回退玻璃膜。
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlassSlider(
@@ -253,6 +257,14 @@ private fun GlassSliderThumb(
     val dark = isDarkGlass()
     val shape = CircleShape
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
+    val haze = LocalGlassHazeState.current
+    val hazeOn = haze != null && hazeAvailable()
+    val glassStyle = remember(dark, base) {
+        GlassStyle.regular.then {
+            shape(RoundedCornerShape(14.dp))
+            tint(base.copy(alpha = 0.10f))
+        }
+    }
     Box(
         Modifier
             .size(28.dp)
@@ -272,12 +284,23 @@ private fun GlassSliderThumb(
                 spotColor = Color.Black.copy(alpha = if (dark) 0.20f else 0.08f)
             )
             .clip(shape)
+            .then(
+                if (hazeOn) {
+                    Modifier.hazeGlass(
+                        input = HazeInput.Sources(haze!!),
+                        style = glassStyle,
+                        interactionSource = null
+                    )
+                } else {
+                    Modifier
+                }
+            )
             .background(
                 Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = if (dark) 0.30f else 0.58f),
-                        base.copy(alpha = if (dark) 0.88f else 0.76f),
-                        base.copy(alpha = if (dark) 0.62f else 0.48f)
+                        Color.White.copy(alpha = if (hazeOn) 0.18f else if (dark) 0.30f else 0.58f),
+                        base.copy(alpha = (if (dark) 0.88f else 0.76f) * if (hazeOn) 0.34f else 1f),
+                        base.copy(alpha = (if (dark) 0.62f else 0.48f) * if (hazeOn) 0.30f else 1f)
                     )
                 )
             )

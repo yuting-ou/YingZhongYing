@@ -7,14 +7,17 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test3) ——
-> 点开 `VivoLivePhoto-v3.0.0-test3.apk` 即可安装（**3.0 液态按压测试版** · 按下鼓起 +
-> 触点高光跟手 + 边缘色散；滑块、预设胶囊、齿轮与按钮统一手感；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test3/VivoLivePhoto-v3.0.0-test3.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test4) ——
+> 点开 `VivoLivePhoto-v3.0.0-test4.apk` 即可安装（**3.0 Haze Glass 测试版** · 小控件真实采样背景 +
+> 按压鼓起/跟手高光/边缘色散；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test4/VivoLivePhoto-v3.0.0-test4.apk) 下载，内容一致。
+>
+> **v3.0.0-test4**：升级 Haze 2.1 Glass，预设胶囊、滑块拇指与玻璃图标磁贴采样真实背景；
+> 按压鼓起、跟手高光与色散保留；大卡片/Dock 继续用 Backdrop 折射。工具链升至 Kotlin 2.4.21 +
+> Compose 1.12.1。**test1 闪退，请勿安装；test2/test3 已被本版取代。**
 >
 > **v3.0.0-test3**：液态玻璃按压效果按 Kyant0/AndroidLiquidGlass 对齐——按下轻微膨胀、
-> 白色折射高光随指尖移动、上青蓝下玫橙的色散边缘；减少动效切静态。小控件继续走安全光谱膜，
-> 大卡片/Dock 保留真实 Backdrop 折射。**test1 闪退，请勿安装；test2 已被本版取代。**
+> 白色折射高光随指尖移动、上青蓝下玫橙的色散边缘；减少动效切静态。
 >
 > **v3.0.0-test2**：修复 test1 真机点击设置齿轮的 RenderThread 闪退——小尺寸 Backdrop
 > 节点在部分 GPU/驱动不安全，滑块与预设改为稳定多层玻璃膜；交互、动效与语义全部保留。
@@ -210,6 +213,13 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test4（Haze Glass · 真实背景采样）
+
+- 升级 Haze 2.1，加入 haze-glass；预设胶囊、滑块拇指、玻璃图标磁贴采样真实背景做模糊/折射。
+- 按压鼓起、触点高光跟手、上青蓝下玫橙色散全部保留；无 GPU/不支持 Glass 时保留玻璃膜底。
+- Kotlin 2.4.21、Compose BOM 2026.09.00（Compose UI 1.12.1）适配新 Glass 引擎。
+- 大卡片/Dock 继续使用 Backdrop 真实折射；小尺寸节点不挂 Backdrop。
 
 ### v3.0.0-test3（液态按压 · 鼓起与色散）
 

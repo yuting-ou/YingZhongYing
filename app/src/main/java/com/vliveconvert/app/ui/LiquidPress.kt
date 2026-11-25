@@ -29,9 +29,8 @@ import kotlin.math.min
 // - Kyant0/AndroidLiquidGlass (Apache-2.0)：LiquidButton/LiquidSlider 的按压曲线，
 //   lens(..., chromaticAberration = true) 的逐通道折射；
 // - QWEA0/Liquid-Glass-Android (MIT)：冷暖通道分离的物理色散与按压凸起。
-// 两者真实色散依赖 Backdrop/AGSL 采样背景；小尺寸节点在部分 GPU/驱动会触发
-// RenderThread SIGSEGV，因此这里用纯 Canvas 光谱膜复现观感，不采样背景。
-// 只画在玻璃表面、位于文字/图标下方。
+// 小尺寸节点不挂 Backdrop；背景采样由 Haze Glass 负责，这里补按压时的光谱膜，
+// 只画在玻璃表面、位于文字/图标下方，避免小尺寸 Backdrop 的驱动闪退。
 
 private val DispersionCyan = Color(0xFF33D6F2)
 private val DispersionBlue = Color(0xFF6A8CFF)
