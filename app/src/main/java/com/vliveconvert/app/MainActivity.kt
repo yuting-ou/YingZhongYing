@@ -136,7 +136,8 @@ import com.vliveconvert.app.ui.LocalGlassBackdrop
 import com.vliveconvert.app.ui.LocalGlassHazeState
 import com.vliveconvert.app.ui.LocalGlassQuality
 import com.vliveconvert.app.ui.glassHazeSource
-import com.vliveconvert.app.ui.glassWallpaper
+import com.vliveconvert.app.ui.glassSamplingWallpaper
+import com.vliveconvert.app.ui.hazeAvailable
 import com.vliveconvert.app.ui.LocalGlassSourceEnabled
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MainScreen
@@ -151,6 +152,8 @@ import com.vliveconvert.app.ui.clickableNoRipple
 import com.vliveconvert.app.ui.dateLabel
 import com.vliveconvert.app.ui.rememberGlassHazeState
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import dev.chrisbanes.haze.HazePerformanceMode
+import dev.chrisbanes.haze.LocalHazePerformanceMode
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1025,7 +1028,12 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalGlassBackdrop provides appGlassBackdrop,
                     LocalGlassHazeState provides appSmallGlassHazeState,
-                    LocalGlassQuality provides glassQuality
+                    LocalGlassQuality provides glassQuality,
+                    LocalHazePerformanceMode provides if (glassQuality.blurScale < 1f) {
+                        HazePerformanceMode.Performance
+                    } else {
+                        HazePerformanceMode.Balanced
+                    }
                 ) {
                 // 前台期间批次结束、攒下待确认删除的原图时立即拉起回收站弹窗
                 // （onStart 只在前后台切换时触发，用户停留前台等完成时靠这里响应；
@@ -1196,7 +1204,9 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.background)
                 ) {
                     // 小尺寸 Glass 的独立采样层：壁纸只在后面录一次，控件不会被采进自己
-                    Box(Modifier.matchParentSize().glassWallpaper().glassHazeSource(appSmallGlassHazeState))
+                    if (hazeAvailable()) {
+                        Box(Modifier.matchParentSize().glassSamplingWallpaper().glassHazeSource(appSmallGlassHazeState))
+                    }
                     // 目标界面：授权后带权限状态一起参与重组，权限授予时也有过渡动画
                     val targetScreen = pickScreen(
                         hasReadPermission(),

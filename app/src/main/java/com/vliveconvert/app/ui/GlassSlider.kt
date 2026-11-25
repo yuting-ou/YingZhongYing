@@ -257,12 +257,14 @@ private fun GlassSliderThumb(
     val dark = isDarkGlass()
     val shape = CircleShape
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
+    val chromatic = glassOptics().third
     val haze = LocalGlassHazeState.current
     val hazeOn = haze != null && hazeAvailable()
-    val glassStyle = remember(dark, base) {
+    val glassStyle = remember(dark, base, chromatic) {
         GlassStyle.regular.then {
             shape(RoundedCornerShape(14.dp))
             tint(base.copy(alpha = 0.10f))
+            chromaticAberrationStrength(if (chromatic) 0.04f else 0f)
         }
     }
     Box(
@@ -315,6 +317,7 @@ private fun GlassSliderThumb(
                 intensity = dispersion,
                 radius = 14.dp,
                 dark = dark,
+                chromatic = chromatic,
                 strength = if (enabled) 1f else 0f
             )
     )

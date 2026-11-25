@@ -97,9 +97,11 @@ internal fun Modifier.glassPressDispersion(
     radius: Dp,
     dark: Boolean,
     touch: Offset? = null,
+    chromatic: Boolean = true,
     strength: Float = 1f
 ): Modifier {
     val p = (intensity * strength).coerceIn(0f, 1f)
+    val spectral = if (chromatic) p else 0f
     if (p <= 0.01f) return this
     return drawBehind {
         val w = size.width
@@ -118,27 +120,29 @@ internal fun Modifier.glassPressDispersion(
         val blob = minSide * 0.62f
         val coolCenter = Offset(w * 0.28f, h * 0.22f)
         val warmCenter = Offset(w * 0.78f, h * 0.84f)
+        val coolColor = if (chromatic) DispersionCyan else Color.White
+        val warmColor = if (chromatic) DispersionRose else Color.White
         val glowBlend = if (dark) BlendMode.Plus else BlendMode.SrcOver
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(DispersionCyan.copy(alpha = 0.55f), Color.Transparent),
+                colors = listOf(coolColor.copy(alpha = 0.55f), Color.Transparent),
                 center = coolCenter,
                 radius = blob
             ),
             radius = blob,
             center = coolCenter,
-            alpha = p * if (dark) 0.12f else 0.09f,
+            alpha = p * if (chromatic) (if (dark) 0.12f else 0.09f) else 0.06f,
             blendMode = glowBlend
         )
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(DispersionRose.copy(alpha = 0.50f), Color.Transparent),
+                colors = listOf(warmColor.copy(alpha = 0.50f), Color.Transparent),
                 center = warmCenter,
                 radius = blob
             ),
             radius = blob,
             center = warmCenter,
-            alpha = p * if (dark) 0.10f else 0.075f,
+            alpha = p * if (chromatic) (if (dark) 0.10f else 0.075f) else 0.05f,
             blendMode = glowBlend
         )
 
@@ -156,7 +160,7 @@ internal fun Modifier.glassPressDispersion(
             size = Size(ringW, ringH),
             cornerRadius = CornerRadius((corner - inset).coerceAtLeast(0f)),
             style = Stroke(stroke),
-            alpha = p * if (dark) 0.92f else 0.82f
+            alpha = spectral * if (dark) 0.92f else 0.82f
         )
 
         // 红青通道偏移：上冷下暖各错开半像素，形成真正的色散边缘而非双描边
@@ -174,7 +178,7 @@ internal fun Modifier.glassPressDispersion(
             size = Size(ringW, ringH),
             cornerRadius = channelRadius,
             style = Stroke(channelStroke),
-            alpha = p * 0.34f,
+            alpha = spectral * 0.34f,
             blendMode = glowBlend
         )
         drawRoundRect(
@@ -187,7 +191,7 @@ internal fun Modifier.glassPressDispersion(
             size = Size(ringW, ringH),
             cornerRadius = channelRadius,
             style = Stroke(channelStroke),
-            alpha = p * 0.34f,
+            alpha = spectral * 0.34f,
             blendMode = glowBlend
         )
 

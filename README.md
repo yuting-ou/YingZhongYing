@@ -7,14 +7,18 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test4) ——
-> 点开 `VivoLivePhoto-v3.0.0-test4.apk` 即可安装（**3.0 Haze Glass 测试版** · 小控件真实采样背景 +
-> 按压鼓起/跟手高光/边缘色散；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test4/VivoLivePhoto-v3.0.0-test4.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test5) ——
+> 点开 `VivoLivePhoto-v3.0.0-test5.apk` 即可安装（**3.0 Haze Glass 打磨版** · 真实背景采样 +
+> 选中态色温/边缘色散/画质联动/跟手高光；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test5/VivoLivePhoto-v3.0.0-test5.apk) 下载，内容一致。
+>
+> **v3.0.0-test5**：在 Haze 2.1 Glass 上收口细节——浅色选中态改深蓝玻璃、静态/按压色散联动、
+> 采样层加入不可见细点纹理让渐变上的折射可读，标准/流畅档与滚动暂停联动 Haze 渲染成本。
+> **test1 闪退，请勿安装；test2～test4 已被本版取代。**
 >
 > **v3.0.0-test4**：升级 Haze 2.1 Glass，预设胶囊、滑块拇指与玻璃图标磁贴采样真实背景；
 > 按压鼓起、跟手高光与色散保留；大卡片/Dock 继续用 Backdrop 折射。工具链升至 Kotlin 2.4.21 +
-> Compose 1.12.1。**test1 闪退，请勿安装；test2/test3 已被本版取代。**
+> Compose 1.12.1。
 >
 > **v3.0.0-test3**：液态玻璃按压效果按 Kyant0/AndroidLiquidGlass 对齐——按下轻微膨胀、
 > 白色折射高光随指尖移动、上青蓝下玫橙的色散边缘；减少动效切静态。
@@ -213,6 +217,14 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test5（Haze Glass · 细节打磨）
+
+- 浅色选中态改为更饱和的深蓝玻璃；深色主题保留薰衣草色玻璃。
+- Haze 静态色散与 Canvas 按压色散统一受玻璃画质档控制；流畅档关闭色散。
+- 小控件采样层加入不可见细点纹理，平滑渐变上也能读出折射细节。
+- Haze 渲染模式跟随标准/流畅档，滚动暂停自动降成本，停手恢复。
+- 浅色/深色、2× 字号、标准/流畅档与减少动效矩阵通过。
 
 ### v3.0.0-test4（Haze Glass · 真实背景采样）
 

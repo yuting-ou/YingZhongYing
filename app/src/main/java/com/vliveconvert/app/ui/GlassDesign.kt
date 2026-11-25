@@ -109,7 +109,9 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.HazePerformanceMode
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.LocalHazePerformanceMode
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
@@ -181,6 +183,34 @@ fun Modifier.glassWallpaper(): Modifier {
     blob(cs.tertiaryContainer, 0.95f, 0.16f, 0.95f, if (dark) 0.32f else 0.70f)
     blob(cs.secondaryContainer, 0.05f, 0.52f, 0.95f, if (dark) 0.28f else 0.60f)
     blob(cs.primary, 0.90f, 0.88f, 0.85f, if (dark) 0.18f else 0.30f)
+    }
+}
+
+/**
+ * 小控件 Glass 的专用采样背景。只画在屏幕背后的采样层，不会露到 UI 上。
+ * 平滑渐变本身几乎看不出折射；一层极淡细点纹理让玻璃边缘有可读的折射细节。
+ */
+@Composable
+fun Modifier.glassSamplingWallpaper(): Modifier {
+    val dark = isDarkGlass()
+    return glassWallpaper().drawBehind {
+        val color = if (dark) Color.White.copy(alpha = 0.035f) else Color.Black.copy(alpha = 0.028f)
+        val step = 18.dp.toPx()
+        val dotRadius = 0.45.dp.toPx()
+        var row = 0
+        var y = step / 2f
+        while (y < size.height && row < 120) {
+            var column = 0
+            var x = step / 2f
+            while (x < size.width && column < 60) {
+                val shift = if ((row + column) % 2 == 0) step * 0.25f else -step * 0.20f
+                drawCircle(color = color, radius = dotRadius, center = Offset(x + shift, y))
+                column++
+                x += step
+            }
+            row++
+            y += step
+        }
     }
 }
 
@@ -296,7 +326,12 @@ fun GlassScrollPauseScope(
         .getSharedPreferences("vliveconvert", 0)
         .getBoolean("perf_pause_glass_scroll", false)
     val paused = enabled && scrollStates.any { it.isScrollInProgress }
-    CompositionLocalProvider(LocalGlassScrollPaused provides paused, content = content)
+    val inheritedHazeMode = LocalHazePerformanceMode.current
+    CompositionLocalProvider(
+        LocalGlassScrollPaused provides paused,
+        LocalHazePerformanceMode provides if (paused) HazePerformanceMode.Performance else inheritedHazeMode,
+        content = content
+    )
 }
 
 /** 当前光学成本系数：blur/lens 缩放 + 是否色散。默认(标准+不滚动)=(1,1,true)。 */
@@ -945,12 +980,14 @@ fun GlassIconTile(
     val tileRadius = if (cornerFraction >= 0.5f) size / 2f
                      else minOf(12.dp, size * cornerFraction)
     val shape = if (cornerFraction >= 0.5f) CircleShape else continuousShape(tileRadius)
+    val chromatic = glassOptics().third
     val haze = LocalGlassHazeState.current
     val hazeOn = onClick != null && haze != null && hazeAvailable()
-    val glassStyle = remember(dark, tint, tileRadius) {
+    val glassStyle = remember(dark, tint, tileRadius, chromatic) {
         GlassStyle.regular.then {
             shape(RoundedCornerShape(tileRadius))
             tint((tint ?: Color.White).copy(alpha = 0.08f))
+            chromaticAberrationStrength(if (chromatic) 0.035f else 0f)
         }
     }
     val glassAlpha = if (hazeOn) 0.52f else 1f
@@ -987,7 +1024,8 @@ fun GlassIconTile(
             intensity = dispersion,
             radius = tileRadius,
             dark = dark,
-            touch = touch
+            touch = touch,
+            chromatic = chromatic
         )
     // 外层占位 = 视觉尺寸（布局不因热区扩张而移动）；点击命中走居中的 48dp
     // 透明代理，溢出部分仍可命中（祖先无 clip）。按压缩放经同一 interactionSource。
@@ -1075,6 +1113,7 @@ fun GlossyButton(
     val scale by rememberPressScale(interaction, pressedScale = 1.015f)
     val dispersion = animateGlassDispersion(pressed)
     val touch = rememberGlassPressPosition(interaction)
+    val chromatic = glassOptics().third
     Box(
         modifier
             .fillMaxWidth()
@@ -1095,6 +1134,7 @@ fun GlossyButton(
                 radius = 27.dp,
                 dark = isDarkGlass(),
                 touch = touch,
+                chromatic = chromatic,
                 strength = 0.55f
             )
             .clickable(interactionSource = interaction, indication = LocalIndication.current) { onClick() },
@@ -1120,6 +1160,7 @@ fun GlassOutlineButton(
     val scale by rememberPressScale(interaction, pressedScale = 1.015f)
     val dispersion = animateGlassDispersion(pressed)
     val touch = rememberGlassPressPosition(interaction)
+    val chromatic = glassOptics().third
     Box(
         modifier
             .fillMaxWidth()
@@ -1136,6 +1177,7 @@ fun GlassOutlineButton(
                 radius = 24.dp,
                 dark = isDarkGlass(),
                 touch = touch,
+                chromatic = chromatic,
                 strength = 0.8f
             )
             .clickable(interactionSource = interaction, indication = LocalIndication.current) { onClick() },
@@ -1185,6 +1227,7 @@ fun GlassPill(
     val scale by rememberPressScale(interaction, pressedScale = 1.03f)
     val dispersion = animateGlassDispersion(onClick != null && pressed)
     val touch = rememberGlassPressPosition(interaction)
+    val chromatic = glassOptics().third
     val base = modifier
         .height(34.dp)
         .graphicsLayer {
@@ -1197,6 +1240,7 @@ fun GlassPill(
             radius = 17.dp,
             dark = isDarkGlass(),
             touch = touch,
+            chromatic = chromatic,
             strength = 0.8f
         )
     Box(

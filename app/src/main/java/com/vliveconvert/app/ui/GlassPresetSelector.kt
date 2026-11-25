@@ -104,18 +104,21 @@ private fun GlassPresetChip(
     val shape = continuousShape(24.dp)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
     val primary = MaterialTheme.colorScheme.primary
+    val selectedColor = if (dark) primary else lerp(primary, Color.Black, 0.18f)
+    val chromatic = glassOptics().third
     val haze = LocalGlassHazeState.current
     val hazeOn = haze != null && hazeAvailable()
-    val glassStyle = remember(dark, selected, base, primary) {
+    val glassStyle = remember(dark, selected, base, selectedColor, chromatic) {
         GlassStyle.regular.then {
             shape(RoundedCornerShape(24.dp))
-            tint(if (selected) primary.copy(alpha = 0.16f) else base.copy(alpha = 0.08f))
+            tint(if (selected) selectedColor.copy(alpha = 0.16f) else base.copy(alpha = 0.08f))
+            chromaticAberrationStrength(if (chromatic) 0.035f else 0f)
         }
     }
     val textColor = presetTextColor(
         selection = selection,
         base = base,
-        primary = primary,
+        primary = selectedColor,
         onSurface = MaterialTheme.colorScheme.onSurface,
         onPrimary = MaterialTheme.colorScheme.onPrimary
     )
@@ -148,7 +151,7 @@ private fun GlassPresetChip(
             }
         )
         .background(base.copy(alpha = if (hazeOn) 0.20f else if (dark) 0.78f else 0.68f))
-        .background(primary.copy(alpha = selection * if (hazeOn) 0.86f else 1f))
+        .background(selectedColor.copy(alpha = selection * if (hazeOn) 0.86f else 1f))
         .border(
             1.dp,
             Brush.verticalGradient(
@@ -164,6 +167,7 @@ private fun GlassPresetChip(
             radius = 24.dp,
             dark = dark || selected,
             touch = touch,
+            chromatic = chromatic,
             strength = 0.9f
         )
 
