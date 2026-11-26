@@ -31,6 +31,8 @@ import kotlin.math.min
 // - QWEA0/Liquid-Glass-Android (MIT)：冷暖通道分离的物理色散与按压凸起。
 // 小尺寸节点不挂 Backdrop；背景采样由 Haze Glass 负责，这里补按压时的光谱膜，
 // 只画在玻璃表面、位于文字/图标下方，避免小尺寸 Backdrop 的驱动闪退。
+// Haze 2.1 的 interaction scale 只接受 <=1；膨胀保留在 graphicsLayer，
+// Haze pressed 仅叠加折射与光照，避免双重缩放和运行时校验崩溃。
 
 private val DispersionCyan = Color(0xFF33D6F2)
 private val DispersionBlue = Color(0xFF6A8CFF)

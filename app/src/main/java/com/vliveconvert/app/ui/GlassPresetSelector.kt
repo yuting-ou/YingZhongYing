@@ -35,7 +35,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.service.PerfPreset
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.glass.GlassReducedMotionPolicy
 import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.GlassTransformTarget
 import dev.chrisbanes.haze.glass.hazeGlass
 
 // 小尺寸节点不挂 Backdrop；有 Haze Glass 时采样真实背景，无 GPU/失效时回退玻璃膜。
@@ -113,6 +115,10 @@ private fun GlassPresetChip(
             shape(RoundedCornerShape(24.dp))
             tint(if (selected) selectedColor.copy(alpha = 0.16f) else base.copy(alpha = 0.08f))
             chromaticAberrationStrength(if (chromatic) 0.035f else 0f)
+            pressed {
+                refractionMultiplier(1.35f)
+                lightingIntensity(0.85f)
+            }
         }
     }
     val textColor = presetTextColor(
@@ -144,7 +150,13 @@ private fun GlassPresetChip(
                 Modifier.hazeGlass(
                     input = HazeInput.Sources(haze!!),
                     style = glassStyle,
-                    interactionSource = null
+                    interactionSource = interaction,
+                    interactionTransformTarget = GlassTransformTarget.MaterialOnly,
+                    interactionReducedMotionPolicy = if (reduceMotion) {
+                        GlassReducedMotionPolicy.Reduced
+                    } else {
+                        GlassReducedMotionPolicy.System
+                    }
                 )
             } else {
                 Modifier

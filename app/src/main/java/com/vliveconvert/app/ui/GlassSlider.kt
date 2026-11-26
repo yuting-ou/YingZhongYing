@@ -52,7 +52,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.glass.GlassReducedMotionPolicy
 import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.GlassTransformTarget
 import dev.chrisbanes.haze.glass.hazeGlass
 import kotlin.math.abs
 
@@ -196,6 +198,7 @@ fun GlassSlider(
             thumb = {
                 GlassSliderThumb(
                     enabled = enabled,
+                    interactionSource = interaction,
                     press = press,
                     dispersion = dispersion,
                     velocity = { velocity }
@@ -249,6 +252,7 @@ fun GlassSlider(
 @Composable
 private fun GlassSliderThumb(
     enabled: Boolean,
+    interactionSource: MutableInteractionSource,
     press: androidx.compose.runtime.State<Float>,
     dispersion: Float,
     velocity: () -> Float
@@ -265,6 +269,10 @@ private fun GlassSliderThumb(
             shape(RoundedCornerShape(14.dp))
             tint(base.copy(alpha = 0.10f))
             chromaticAberrationStrength(if (chromatic) 0.04f else 0f)
+            pressed {
+                refractionMultiplier(1.50f)
+                lightingIntensity(0.90f)
+            }
         }
     }
     Box(
@@ -291,7 +299,13 @@ private fun GlassSliderThumb(
                     Modifier.hazeGlass(
                         input = HazeInput.Sources(haze!!),
                         style = glassStyle,
-                        interactionSource = null
+                        interactionSource = interactionSource,
+                        interactionTransformTarget = GlassTransformTarget.MaterialOnly,
+                        interactionReducedMotionPolicy = if (reduceMotion) {
+                            GlassReducedMotionPolicy.Reduced
+                        } else {
+                            GlassReducedMotionPolicy.System
+                        }
                     )
                 } else {
                     Modifier

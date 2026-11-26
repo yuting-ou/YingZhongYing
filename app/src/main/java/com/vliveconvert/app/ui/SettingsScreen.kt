@@ -318,6 +318,24 @@ internal fun SettingsScreen(
                         style = settingsDescriptionStyle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .toggleable(
+                                value = perf.glassCompatibility,
+                                role = Role.Switch,
+                                onValueChange = { onPerfChange(perf.copy(glassCompatibility = it)) }),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("玻璃兼容模式", style = settingsCardTitleStyle(),
+                                color = MaterialTheme.colorScheme.onSurface)
+                            Text("关闭实时折射，避免部分 GPU/驱动闪退", style = settingsDescriptionStyle(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = perf.glassCompatibility, onCheckedChange = null)
+                    }
+                    Spacer(Modifier.height(12.dp))
                     // 与本页其它开关同一约定：点标签整行即切换（toggleable 挂 Row，
                     // Switch 只作显示，避免双触发）
                     Row(
@@ -357,6 +375,23 @@ internal fun SettingsScreen(
                         )
                     }
                 )
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = perf.photoAmbient,
+                            role = Role.Switch,
+                            onValueChange = { onPerfChange(perf.copy(photoAmbient = it)) }),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("照片氛围背景", style = settingsCardTitleStyle(),
+                            color = MaterialTheme.colorScheme.onSurface)
+                        Text("玻璃透出当前首选照片；无照片时回退壁纸", style = settingsDescriptionStyle(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = perf.photoAmbient, onCheckedChange = null)
+                }
                 SettingsSection("工具")
                 SettingsPair(singleColumn,
                     first = { modifier ->

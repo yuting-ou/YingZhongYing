@@ -89,9 +89,11 @@ internal fun rememberPressScale(
     pressedScale: Float = 0.97f
 ): androidx.compose.runtime.State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
+    val reduceMotion = LocalReduceMotion.current
     return androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
-        animationSpec = androidx.compose.animation.core.spring(
+        animationSpec = if (reduceMotion) androidx.compose.animation.core.snap()
+        else androidx.compose.animation.core.spring(
             dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
             stiffness = androidx.compose.animation.core.Spring.StiffnessHigh),
         label = "pressScale"

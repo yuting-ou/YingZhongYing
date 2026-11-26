@@ -115,7 +115,9 @@ import dev.chrisbanes.haze.LocalHazePerformanceMode
 import dev.chrisbanes.haze.blur.HazeBlurStyle
 import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
+import dev.chrisbanes.haze.glass.GlassReducedMotionPolicy
 import dev.chrisbanes.haze.glass.GlassStyle
+import dev.chrisbanes.haze.glass.GlassTransformTarget
 import dev.chrisbanes.haze.glass.hazeGlass
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -193,24 +195,26 @@ fun Modifier.glassWallpaper(): Modifier {
 @Composable
 fun Modifier.glassSamplingWallpaper(): Modifier {
     val dark = isDarkGlass()
-    return glassWallpaper().drawBehind {
-        val color = if (dark) Color.White.copy(alpha = 0.035f) else Color.Black.copy(alpha = 0.028f)
-        val step = 18.dp.toPx()
-        val dotRadius = 0.45.dp.toPx()
-        var row = 0
-        var y = step / 2f
-        while (y < size.height && row < 120) {
-            var column = 0
-            var x = step / 2f
-            while (x < size.width && column < 60) {
-                val shift = if ((row + column) % 2 == 0) step * 0.25f else -step * 0.20f
-                drawCircle(color = color, radius = dotRadius, center = Offset(x + shift, y))
-                column++
-                x += step
-            }
-            row++
-            y += step
+    return glassWallpaper().glassSamplingTexture(dark)
+}
+
+internal fun Modifier.glassSamplingTexture(dark: Boolean): Modifier = drawBehind {
+    val color = if (dark) Color.White.copy(alpha = 0.035f) else Color.Black.copy(alpha = 0.028f)
+    val step = 18.dp.toPx()
+    val dotRadius = 0.45.dp.toPx()
+    var row = 0
+    var y = step / 2f
+    while (y < size.height && row < 120) {
+        var column = 0
+        var x = step / 2f
+        while (x < size.width && column < 60) {
+            val shift = if ((row + column) % 2 == 0) step * 0.25f else -step * 0.20f
+            drawCircle(color = color, radius = dotRadius, center = Offset(x + shift, y))
+            column++
+            x += step
         }
+        row++
+        y += step
     }
 }
 
@@ -278,7 +282,8 @@ private fun isEmulatorRuntime(): Boolean =
 
 @Composable
 internal fun hazeAvailable(): Boolean =
-    !isRobolectricRuntime() && !isEmulatorRuntime() && LocalView.current.isHardwareAccelerated
+    !LocalGlassCompatibility.current && !isRobolectricRuntime() &&
+        !isEmulatorRuntime() && LocalView.current.isHardwareAccelerated
 
 @Composable
 fun rememberGlassHazeState(): HazeState {
@@ -299,6 +304,12 @@ val LocalGlassBackdrop = staticCompositionLocalOf<LayerBackdrop?> { null }
 
 /** 当前页 Haze 源；小尺寸 Glass 采样真实背景用 */
 internal val LocalGlassHazeState = staticCompositionLocalOf<HazeState?> { null }
+
+/** 兼容模式：关闭 Backdrop/Haze 实时折射，只保留安全玻璃膜 */
+internal val LocalGlassCompatibility = compositionLocalOf { false }
+
+/** 照片氛围：玻璃采样当前首选照片，页面本身仍使用原壁纸 */
+internal val LocalGlassPhotoAmbient = compositionLocalOf { false }
 
 /**
  * 当前页是否把自己的内容注册成折射采样源。
@@ -966,6 +977,7 @@ fun GlassIconTile(
     content: @Composable BoxScope.() -> Unit
 ) {
     val dark = isDarkGlass()
+    val reduceMotion = LocalReduceMotion.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by rememberPressScale(interaction, pressedScale = 1.06f)
@@ -988,6 +1000,10 @@ fun GlassIconTile(
             shape(RoundedCornerShape(tileRadius))
             tint((tint ?: Color.White).copy(alpha = 0.08f))
             chromaticAberrationStrength(if (chromatic) 0.035f else 0f)
+            pressed {
+                refractionMultiplier(1.30f)
+                lightingIntensity(0.80f)
+            }
         }
     }
     val glassAlpha = if (hazeOn) 0.52f else 1f
@@ -1012,7 +1028,13 @@ fun GlassIconTile(
                 Modifier.hazeGlass(
                     input = HazeInput.Sources(haze!!),
                     style = glassStyle,
-                    interactionSource = null
+                    interactionSource = interaction,
+                    interactionTransformTarget = GlassTransformTarget.MaterialOnly,
+                    interactionReducedMotionPolicy = if (reduceMotion) {
+                        GlassReducedMotionPolicy.Reduced
+                    } else {
+                        GlassReducedMotionPolicy.System
+                    }
                 )
             } else {
                 Modifier

@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
+import android.widget.Toast
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
@@ -133,11 +134,13 @@ import com.vliveconvert.app.ui.LocationRecoveryScreen
 import com.vliveconvert.app.ui.GlassIndeterminateBar
 import com.vliveconvert.app.ui.GlassTextField
 import com.vliveconvert.app.ui.LocalGlassBackdrop
+import com.vliveconvert.app.ui.LocalGlassCompatibility
 import com.vliveconvert.app.ui.LocalGlassHazeState
+import com.vliveconvert.app.ui.LocalGlassPhotoAmbient
 import com.vliveconvert.app.ui.LocalGlassQuality
 import com.vliveconvert.app.ui.glassHazeSource
-import com.vliveconvert.app.ui.glassSamplingWallpaper
 import com.vliveconvert.app.ui.hazeAvailable
+import com.vliveconvert.app.ui.rememberAmbientGlassPhoto
 import com.vliveconvert.app.ui.LocalGlassSourceEnabled
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MainScreen
@@ -148,6 +151,8 @@ import com.vliveconvert.app.ui.SettingsScreen
 import com.vliveconvert.app.ui.ShareIntents
 import com.vliveconvert.app.ui.ThemedSnackbarHost
 import com.vliveconvert.app.ui.GlassDivider
+import com.vliveconvert.app.ui.GlassCrashSafety
+import com.vliveconvert.app.ui.GlassSamplingBackdrop
 import com.vliveconvert.app.ui.clickableNoRipple
 import com.vliveconvert.app.ui.dateLabel
 import com.vliveconvert.app.ui.rememberGlassHazeState
@@ -992,7 +997,17 @@ class MainActivity : ComponentActivity() {
         dynamicColor = getSharedPreferences("vliveconvert", MODE_PRIVATE)
             .getBoolean("dynamic_color", true)
         // 性能设置（自动挡默认）：缩略图并发即时生效
-        perf = PerfStore(this).load()
+        val loadedPerf = PerfStore(this).load()
+        val (safePerf, recoveredFromNativeCrash) = GlassCrashSafety.recoverIfNeeded(this, loadedPerf)
+        perf = safePerf
+        if (recoveredFromNativeCrash) {
+            PerfStore(this).save(safePerf)
+            Toast.makeText(
+                this,
+                "检测到上次原生崩溃，已自动开启玻璃兼容模式；可在设置中关闭。",
+                Toast.LENGTH_LONG
+            ).show()
+        }
         ThumbConcurrency.setThreads(perf.effectiveThumbThreads())
         refreshRestoreCount()
         // 恢复自定义输出目录
@@ -1019,8 +1034,13 @@ class MainActivity : ComponentActivity() {
                     firstFrameReady = true
                 }
                 val appHazeState = rememberGlassHazeState()
-                // 小尺寸 Glass 的采样源：只录壁纸，不把控件自身卷进去
+                // 小尺寸 Glass 的采样源：只录背景，不把控件自身卷进去
                 val appSmallGlassHazeState = rememberGlassHazeState()
+                val ambientPhotoUri = ConvertCenter.items.firstOrNull()?.item?.uri
+                val ambientPhoto = rememberAmbientGlassPhoto(
+                    enabled = perf.photoAmbient && !perf.glassCompatibility,
+                    uri = ambientPhotoUri
+                )
                 // 折射采样层：页面内容录进 GraphicsLayer，所有玻璃卡按自身位置取背景做 SDF 折射
                 val appGlassBackdrop = rememberLayerBackdrop()
                 // derivedStateOf：滑杆每 tick 都改 perf，但只有档位真变才失效玻璃子树
@@ -1028,6 +1048,8 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalGlassBackdrop provides appGlassBackdrop,
                     LocalGlassHazeState provides appSmallGlassHazeState,
+                    LocalGlassCompatibility provides perf.glassCompatibility,
+                    LocalGlassPhotoAmbient provides perf.photoAmbient,
                     LocalGlassQuality provides glassQuality,
                     LocalHazePerformanceMode provides if (glassQuality.blurScale < 1f) {
                         HazePerformanceMode.Performance
@@ -1205,7 +1227,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     // 小尺寸 Glass 的独立采样层：壁纸只在后面录一次，控件不会被采进自己
                     if (hazeAvailable()) {
-                        Box(Modifier.matchParentSize().glassSamplingWallpaper().glassHazeSource(appSmallGlassHazeState))
+                        Box(Modifier.matchParentSize().glassHazeSource(appSmallGlassHazeState)) {
+                            GlassSamplingBackdrop(ambientPhoto)
+                        }
                     }
                     // 目标界面：授权后带权限状态一起参与重组，权限授予时也有过渡动画
                     val targetScreen = pickScreen(

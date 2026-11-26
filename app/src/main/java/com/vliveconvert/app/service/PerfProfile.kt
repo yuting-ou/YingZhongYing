@@ -23,6 +23,10 @@ internal data class PerfSettings(
     val glassQuality: GlassQuality = GlassQuality.Standard,
     /** 滚动期间临时降低玻璃采样成本（保持玻璃观感，停手即恢复），默认关 */
     val pauseGlassOnScroll: Boolean = false,
+    /** 关闭 Backdrop/Haze 实时折射，只保留安全玻璃膜，默认关 */
+    val glassCompatibility: Boolean = false,
+    /** 用当前首选照片作为玻璃采样背景，默认关 */
+    val photoAmbient: Boolean = false,
 ) {
     companion object {
         private const val MB = 1024L * 1024L
@@ -122,7 +126,9 @@ internal class PerfStore(context: Context) {
         scanThreads = prefs.getInt("perf_scan_threads", 4).coerceIn(1, 8),
         thumbThreads = prefs.getInt("perf_thumb_threads", 4).coerceIn(1, 8),
         glassQuality = GlassQuality.fromKey(prefs.getString("perf_glass_quality", null)),
-        pauseGlassOnScroll = prefs.getBoolean("perf_pause_glass_scroll", false)
+        pauseGlassOnScroll = prefs.getBoolean("perf_pause_glass_scroll", false),
+        glassCompatibility = prefs.getBoolean("perf_glass_compat", false),
+        photoAmbient = prefs.getBoolean("perf_photo_ambient", false)
     )
 
     fun save(s: PerfSettings) {
@@ -134,6 +140,8 @@ internal class PerfStore(context: Context) {
             .putInt("perf_thumb_threads", s.thumbThreads.coerceIn(1, 8))
             .putString("perf_glass_quality", s.glassQuality.name)
             .putBoolean("perf_pause_glass_scroll", s.pauseGlassOnScroll)
+            .putBoolean("perf_glass_compat", s.glassCompatibility)
+            .putBoolean("perf_photo_ambient", s.photoAmbient)
             .apply()
     }
 }

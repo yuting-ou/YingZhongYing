@@ -108,6 +108,8 @@ class PerfProfileTest {
         val s = PerfSettings()
         assertEquals(com.vliveconvert.app.service.GlassQuality.Standard, s.glassQuality)
         assertEquals(false, s.pauseGlassOnScroll)
+        assertEquals(false, s.glassCompatibility)
+        assertEquals(false, s.photoAmbient)
         // 标准档必须与旧观感零差异：缩放=1、色散开
         assertEquals(1.0f, s.glassQuality.blurScale)
         assertEquals(1.0f, s.glassQuality.lensScale)
@@ -138,13 +140,17 @@ class PerfProfileTest {
         // 预设只填充转换四旋钮；玻璃画质/滚动降成本是显示设置，不得被静默重置
         val current = PerfSettings(
             glassQuality = com.vliveconvert.app.service.GlassQuality.Saver,
-            pauseGlassOnScroll = true)
+            pauseGlassOnScroll = true,
+            glassCompatibility = true,
+            photoAmbient = true)
         PerfPreset.entries.forEach { p ->
             val applied = current.applyPreset(p)
             assertEquals("预设 ${p.name} 改动了玻璃画质",
                 com.vliveconvert.app.service.GlassQuality.Saver, applied.glassQuality)
             assertEquals("预设 ${p.name} 改动了滚动降成本开关",
                 true, applied.pauseGlassOnScroll)
+            assertEquals("预设 ${p.name} 改动了兼容模式", true, applied.glassCompatibility)
+            assertEquals("预设 ${p.name} 改动了照片氛围", true, applied.photoAmbient)
             assertEquals(true, applied.manual)
         }
     }
@@ -153,10 +159,12 @@ class PerfProfileTest {
     fun glassSettingsRoundTrip() {
         val store = PerfStore(ApplicationProvider.getApplicationContext())
         store.save(PerfSettings(glassQuality = com.vliveconvert.app.service.GlassQuality.Saver,
-            pauseGlassOnScroll = true))
+            pauseGlassOnScroll = true, glassCompatibility = true, photoAmbient = true))
         val loaded = store.load()
         assertEquals(com.vliveconvert.app.service.GlassQuality.Saver, loaded.glassQuality)
         assertEquals(true, loaded.pauseGlassOnScroll)
+        assertEquals(true, loaded.glassCompatibility)
+        assertEquals(true, loaded.photoAmbient)
         // 复位默认，避免污染其它用例
         store.save(PerfSettings())
     }
