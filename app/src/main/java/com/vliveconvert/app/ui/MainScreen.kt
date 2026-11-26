@@ -872,7 +872,7 @@ private fun rememberCompletionFlash(key: Any, done: Boolean): Float {
     LaunchedEffect(done) {
         if (done && !previous && !reduceMotion) {
             flash.snapTo(1f)
-            flash.animateTo(0f, tween(450, easing = LinearOutSlowInEasing))
+            flash.animateTo(0f, tween(340, easing = LinearOutSlowInEasing))
         }
         previous = done
     }
@@ -1142,7 +1142,7 @@ private fun ConvertItemGridCard(
             if (completionFlash > 0.001f) {
                 Box(
                     Modifier.fillMaxSize().background(
-                        Color.White.copy(alpha = completionFlash * 0.30f)
+                        Color.White.copy(alpha = completionFlash * 0.22f)
                     )
                 )
             }
@@ -1162,16 +1162,8 @@ private fun ConvertItemGridCard(
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     ),
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)
                 )
-                Box(
-                    Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp)
-                        .padding(bottom = 10.dp)
-                ) {
-                    GlassIndeterminateBar(height = 3.dp)
-                }
             }
 
             ConvertStatusBadge(
@@ -1213,25 +1205,35 @@ private fun ConvertItemGridCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)
         )
-        AnimatedContent(
-            targetState = ci.status,
-            transitionSpec = {
-                if (reduceMotion) {
-                    fadeIn(snap()) togetherWith fadeOut(snap())
-                } else {
-                    fadeIn(tween(160, easing = EaseOutStrong)) togetherWith
-                        fadeOut(tween(120))
-                }
-            },
-            label = "gridStatus"
-        ) { statusText ->
+        if (busy) {
             Text(
-                statusText,
+                ci.status,
                 style = TextStyle(fontSize = 10.sp, color = statusColor),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             )
+        } else {
+            AnimatedContent(
+                targetState = ci.status,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        fadeIn(snap()) togetherWith fadeOut(snap())
+                    } else {
+                        fadeIn(tween(160, easing = EaseOutStrong)) togetherWith
+                            fadeOut(tween(120))
+                    }
+                },
+                label = "gridStatus"
+            ) { statusText ->
+                Text(
+                    statusText,
+                    style = TextStyle(fontSize = 10.sp, color = statusColor),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                )
+            }
         }
         Spacer(Modifier.height(6.dp))
     }

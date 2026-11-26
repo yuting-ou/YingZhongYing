@@ -7,14 +7,17 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test7) ——
-> 点开 `VivoLivePhoto-v3.0.0-test7.apk` 即可安装（**3.0 网格转换动效版** · 忙碌暗幕/转圈/进度条 +
-> 状态过渡/完成闪白/徽标弹入/失败抖动；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test7/VivoLivePhoto-v3.0.0-test7.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test8) ——
+> 点开 `VivoLivePhoto-v3.0.0-test8.apk` 即可安装（**3.0 网格动效打磨版** · 单转圈/忙碌文案即时更新 +
+> 轻闪白/徽标弹入/失败抖动；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test8/VivoLivePhoto-v3.0.0-test8.apk) 下载，内容一致。
+>
+> **v3.0.0-test8**：网格忙碌态精简为单转圈，状态文案即时更新；完成闪白降至 22%/340ms，
+> 降低多张并发的动画开销；失败抖动、徽标弹入与减少动效保持不变。
+> **test1 闪退，请勿安装；test2～test7 已被本版取代。**
 >
 > **v3.0.0-test7**：补齐网格模式转换动效——忙碌暗幕、旋转弧、不确定进度条、状态交叉过渡、
 > 完成闪白与徽标弹入、失败抖动/触觉、网格结构动画；减少动效自动切静态。
-> **test1 闪退，请勿安装；test2～test6 已被本版取代。**
 >
 > **v3.0.0-test6**：Haze Glass 接入真实按压折射/光照；新增玻璃兼容模式、原生崩溃自动恢复与
 > 照片氛围背景。照片只在玻璃后显示，不上传；兼容模式可一键退回稳定玻璃膜。
@@ -223,6 +226,12 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test8（网格动效细节打磨）
+
+- 网格忙碌态只保留单转圈与状态提示，移除重复不确定进度条，降低多张并发动画开销。
+- 忙碌文案即时切换，不再短暂显示“待转换”；终态仍交叉过渡。
+- 完成闪白收敛到 22% 透明度、340ms；失败抖动/徽标/触觉与减少动效不变。
 
 ### v3.0.0-test7（网格转换动效）
 
