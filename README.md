@@ -7,14 +7,17 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test6) ——
-> 点开 `VivoLivePhoto-v3.0.0-test6.apk` 即可安装（**3.0 液态玻璃安全/折射版** · Haze 真实按压折射 +
-> 玻璃兼容模式 + 原生崩溃自动恢复 + 照片氛围背景；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test6/VivoLivePhoto-v3.0.0-test6.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test7) ——
+> 点开 `VivoLivePhoto-v3.0.0-test7.apk` 即可安装（**3.0 网格转换动效版** · 忙碌暗幕/转圈/进度条 +
+> 状态过渡/完成闪白/徽标弹入/失败抖动；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test7/VivoLivePhoto-v3.0.0-test7.apk) 下载，内容一致。
+>
+> **v3.0.0-test7**：补齐网格模式转换动效——忙碌暗幕、旋转弧、不确定进度条、状态交叉过渡、
+> 完成闪白与徽标弹入、失败抖动/触觉、网格结构动画；减少动效自动切静态。
+> **test1 闪退，请勿安装；test2～test6 已被本版取代。**
 >
 > **v3.0.0-test6**：Haze Glass 接入真实按压折射/光照；新增玻璃兼容模式、原生崩溃自动恢复与
 > 照片氛围背景。照片只在玻璃后显示，不上传；兼容模式可一键退回稳定玻璃膜。
-> **test1 闪退，请勿安装；test2～test5 已被本版取代。**
 >
 > **v3.0.0-test5**：在 Haze 2.1 Glass 上收口细节——浅色选中态改深蓝玻璃、静态/按压色散联动、
 > 采样层加入不可见细点纹理让渐变上的折射可读，标准/流畅档与滚动暂停联动 Haze 渲染成本。
@@ -220,6 +223,13 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test7（网格转换动效）
+
+- 网格卡片转换中显示暗幕、旋转不确定弧、底部不确定进度条与“转换中…”提示。
+- 状态底色/文字颜色平滑过渡，状态文案交叉淡入淡出。
+- 完成闪白 + 对勾徽标弹入；失败/丢位置感叹徽标、失败抖动与拒绝触觉。
+- 网格项接入 animateItem；减少动效关闭无限/位移动画，保留状态与触觉。
 
 ### v3.0.0-test6（液态玻璃 · 折射交互与安全模式）
 

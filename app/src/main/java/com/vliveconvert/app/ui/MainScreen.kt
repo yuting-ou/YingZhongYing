@@ -102,6 +102,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
@@ -451,7 +452,16 @@ fun MainScreen(
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     gridItems(items, key = { it.item.key }) { ci ->
-                                        ConvertItemGridCard(ci = ci, onRemove = { onRemove(ci) })
+                                        ConvertItemGridCard(
+                                            modifier = Modifier.animateItem(
+                                                fadeInSpec = if (reduceMotion) null else tween(220),
+                                                placementSpec = if (reduceMotion) null else spring(
+                                                    dampingRatio = 0.9f, stiffness = 380f),
+                                                fadeOutSpec = if (reduceMotion) null else tween(180)
+                                            ),
+                                            ci = ci,
+                                            onRemove = { onRemove(ci) }
+                                        )
                                     }
                                 }
                             } else {
@@ -723,6 +733,152 @@ private fun EmptyState(onAdd: () -> Unit) {
     }
 }
 
+private data class ConvertBadge(
+    val glyph: String,
+    val background: Color,
+    val foreground: Color
+)
+
+@Composable
+private fun convertBadge(ci: ConvertItem): ConvertBadge? {
+    val status = statusColors
+    return when {
+        ci.failed -> ConvertBadge("!", MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.onError)
+        ci.done && ci.lostGps -> ConvertBadge("!", status.warning, status.onWarning)
+        ci.done -> ConvertBadge("✓", status.success, status.onSuccess)
+        else -> null
+    }
+}
+
+@Composable
+private fun ConvertStatusBadge(
+    badge: ConvertBadge?,
+    modifier: Modifier,
+    diameter: androidx.compose.ui.unit.Dp,
+    glyphSize: Int
+) {
+    val reduceMotion = LocalReduceMotion.current
+    val scale by animateFloatAsState(
+        targetValue = if (badge == null) 0.4f else 1f,
+        animationSpec = if (reduceMotion) snap()
+        else spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "convertBadgeScale"
+    )
+    if (badge != null) {
+        GlassCircle(
+            size = diameter,
+            tint = badge.background,
+            modifier = modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+        ) {
+            Text(
+                badge.glyph,
+                style = TextStyle(
+                    fontSize = glyphSize.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = badge.foreground
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun BusyProgressArc(
+    modifier: Modifier,
+    color: Color,
+    diameter: androidx.compose.ui.unit.Dp = 54.dp,
+    strokeWidth: androidx.compose.ui.unit.Dp = 2.5.dp
+) {
+    val reduceMotion = LocalReduceMotion.current
+    val angle = if (reduceMotion) 0f else {
+        val animated by rememberInfiniteTransition(label = "convertRing").animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                tween(900, easing = LinearEasing)
+            ),
+            label = "convertRingAngle"
+        )
+        animated
+    }
+    Canvas(modifier.size(diameter)) {
+        val stroke = strokeWidth.toPx()
+        val inset = stroke / 2f
+        drawArc(
+            color = color,
+            startAngle = -90f + angle,
+            sweepAngle = 110f,
+            useCenter = false,
+            topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+            size = androidx.compose.ui.geometry.Size(
+                (size.width - inset * 2f).coerceAtLeast(0f),
+                (size.height - inset * 2f).coerceAtLeast(0f)
+            ),
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+    }
+}
+
+@Composable
+private fun convertStatusColor(ci: ConvertItem): Color {
+    val target = when {
+        ci.failed -> MaterialTheme.colorScheme.error
+        ci.done && ci.lostGps -> MaterialTheme.colorScheme.tertiary
+        ci.done -> statusColors.success
+        isBusyStatus(ci.status) -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val reduceMotion = LocalReduceMotion.current
+    return animateColorAsState(
+        targetValue = target,
+        animationSpec = if (reduceMotion) snap() else tween(240),
+        label = "convertStatusColor"
+    ).value
+}
+
+@Composable
+private fun rememberFailureShake(key: Any, failed: Boolean): Float {
+    val hapticView = LocalView.current
+    val reduceMotion = LocalReduceMotion.current
+    var previous by remember(key) { mutableStateOf(failed) }
+    val shake = remember { Animatable(0f) }
+    LaunchedEffect(failed) {
+        if (failed && !previous) {
+            hapticView.performHapticFeedback(android.view.HapticFeedbackConstants.REJECT)
+            if (!reduceMotion) {
+                for (distance in listOf(-10f, 10f, -7f, 7f, -3f, 0f)) {
+                    shake.snapTo(distance)
+                    delay(45)
+                }
+            }
+        }
+        previous = failed
+    }
+    return shake.value
+}
+
+@Composable
+private fun rememberCompletionFlash(key: Any, done: Boolean): Float {
+    val reduceMotion = LocalReduceMotion.current
+    var previous by remember(key) { mutableStateOf(done) }
+    val flash = remember { Animatable(0f) }
+    LaunchedEffect(done) {
+        if (done && !previous && !reduceMotion) {
+            flash.snapTo(1f)
+            flash.animateTo(0f, tween(450, easing = LinearOutSlowInEasing))
+        }
+        previous = done
+    }
+    return flash.value
+}
+
 /**
  * 列表项：缩略图右下角状态角标 + 状态文案前置图标 + 行底色。
  * 状态不再只靠文字颜色区分（图标/徽标/底色三重编码）。
@@ -739,6 +895,7 @@ private fun ConvertItemRow(
     val busy = isBusyStatus(ci.status)
     val lostGps = ci.done && ci.lostGps && !ci.failed
     val status = statusColors
+    val reduceMotion = LocalReduceMotion.current
     // 行底必须不透明（挡住左滑红底），但深色主题用纯 surface 会黑成一块板；
     // 换成低容器色，和玻璃面板的暗部接得上
     val rowBase = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f)
@@ -751,37 +908,17 @@ private fun ConvertItemRow(
         lostGps -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.10f)
         else -> Color.Transparent
     }
-    val bg by animateColorAsState(bgTarget, tween(300), label = "rowBg")
+    val bg by animateColorAsState(
+        bgTarget,
+        if (reduceMotion) snap() else tween(300),
+        label = "rowBg"
+    )
     val main = MaterialTheme.colorScheme.onSurface
     // 转换中跟随主题主色（莫奈取色）；固定蓝会在动态取色下与其他强调色脱节
     val busyColor = MaterialTheme.colorScheme.primary
-    val statusColorTarget = when {
-        ci.failed -> MaterialTheme.colorScheme.error
-        lostGps -> MaterialTheme.colorScheme.tertiary
-        ci.done -> status.success
-        busy -> busyColor
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    // 转换中 → 完成 / 失败的状态切换用颜色缓动，避免文字颜色硬跳
-    val statusColor by animateColorAsState(statusColorTarget, tween(240), label = "statusColor")
-
-    // 失败抖动 + 同帧触觉（逻辑与 v2.0.9 一致）；减少动效时保留触觉、去掉位移
+    val statusColor = convertStatusColor(ci)
     val hapticView = LocalView.current
-    val reduceMotion = LocalReduceMotion.current
-    var prevFailed by remember(ci.item.key) { mutableStateOf(ci.failed) }
-    val shakeX = remember { Animatable(0f) }
-    LaunchedEffect(ci.failed) {
-        if (ci.failed && !prevFailed) {
-            hapticView.performHapticFeedback(android.view.HapticFeedbackConstants.REJECT)
-            if (!reduceMotion) {
-                for (d in listOf(-10f, 10f, -7f, 7f, -3f, 0f)) {
-                    shakeX.snapTo(d)
-                    delay(45)
-                }
-            }
-        }
-        prevFailed = ci.failed
-    }
+    val shakeX = rememberFailureShake(ci.item.key, ci.failed)
     // 左滑移除：阈值 60% + 撤销条（逻辑不变）
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
@@ -829,7 +966,7 @@ private fun ConvertItemRow(
                 // 会透过整块玻璃行显出来，静止状态看起来所有行都「失败」了
                 .background(rowBase)
                 .background(bg)
-                .graphicsLayer { translationX = shakeX.value }
+                .graphicsLayer { translationX = shakeX }
         ) {
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
@@ -838,29 +975,10 @@ private fun ConvertItemRow(
                 Box(Modifier.size(46.dp)) {
                     // 转换中：缩略图外圈一道不确定弧
                     if (busy) {
-                        if (LocalReduceMotion.current) {
-                            // 静态弧：固定角度，不建 infinite transition
-                            Canvas(Modifier.size(54.dp).align(Alignment.Center)) {
-                                drawArc(
-                                    color = busyColor,
-                                    startAngle = 70f, sweepAngle = 110f, useCenter = false,
-                                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                            }
-                        } else {
-                            val ringAngle by rememberInfiniteTransition(label = "ring").animateFloat(
-                                initialValue = 0f, targetValue = 360f,
-                                animationSpec = infiniteRepeatable(
-                                    tween(900, easing = LinearEasing)), label = "ringAngle"
-                            )
-                            Canvas(Modifier.size(54.dp).align(Alignment.Center)) {
-                                drawArc(
-                                    color = busyColor,
-                                    startAngle = -90f + ringAngle, sweepAngle = 110f, useCenter = false,
-                                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                            }
-                        }
+                        BusyProgressArc(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = busyColor
+                        )
                     }
                     Box(
                         Modifier
@@ -881,39 +999,12 @@ private fun ConvertItemRow(
                         )
                     }
                     // 状态角标：玻璃圆钮 + 符号；弹入动画保留
-                    val badge: Triple<String, Color, Color>? = when {
-                        ci.failed -> Triple("!", MaterialTheme.colorScheme.error,
-                            MaterialTheme.colorScheme.onError)
-                        lostGps -> Triple("!", status.warning, status.onWarning)
-                        ci.done -> Triple("✓", status.success, status.onSuccess)
-                        else -> null
-                    }
-                    val badgeScale by animateFloatAsState(
-                        targetValue = if (badge == null) 0.4f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "badgeScale"
+                    ConvertStatusBadge(
+                        badge = convertBadge(ci),
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                        diameter = 19.dp,
+                        glyphSize = 10
                     )
-                    if (badge != null) {
-                        GlassCircle(
-                            size = 19.dp,
-                            tint = badge.second,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .graphicsLayer {
-                                    scaleX = badgeScale
-                                    scaleY = badgeScale
-                                }
-                        ) {
-                            Text(
-                                badge.first,
-                                style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                                    color = badge.third)
-                            )
-                        }
-                    }
                     // 实况小徽标（装饰，不占语义）
                     GlassCircle(
                         size = 16.dp,
@@ -1006,27 +1097,39 @@ private fun ConvertItemRow(
  */
 @Composable
 private fun ConvertItemGridCard(
+    modifier: Modifier = Modifier,
     ci: ConvertItem,
     onRemove: () -> Unit
 ) {
     val resolver = LocalContext.current.contentResolver
+    val reduceMotion = LocalReduceMotion.current
     val busy = isBusyStatus(ci.status)
     val lostGps = ci.done && ci.lostGps && !ci.failed
-    val status = statusColors
-    val tint = when {
+    val busyColor = MaterialTheme.colorScheme.primary
+    val statusColor = convertStatusColor(ci)
+    val shake = rememberFailureShake(ci.item.key, ci.failed)
+    val completionFlash = rememberCompletionFlash(ci.item.key, ci.done)
+    val tintTarget = when {
         ci.failed -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
         lostGps -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
         else -> Color.Transparent
     }
+    val tint by animateColorAsState(
+        tintTarget,
+        if (reduceMotion) snap() else tween(300),
+        label = "gridTint"
+    )
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .clip(continuousShape(16.dp))
             .background(
                 if (MaterialTheme.colorScheme.surface.luminance() < 0.5f)
                     MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f))
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+            )
             .background(tint)
+            .graphicsLayer { translationX = shake }
             .semantics { contentDescription = "${ci.item.name}，${ci.status}" }
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
@@ -1035,28 +1138,51 @@ private fun ConvertItemGridCard(
                 runCatching { android.net.Uri.parse(it) }.getOrNull()
             } ?: ci.item.uri
             MediaThumbnail(thumbUri, resolver, Modifier.fillMaxSize())
-            // 状态角标（与列表行同一套符号/语义色）
-            val badge: Triple<String, Color, Color>? = when {
-                ci.failed -> Triple("!", MaterialTheme.colorScheme.error,
-                    MaterialTheme.colorScheme.onError)
-                lostGps -> Triple("!", status.warning, status.onWarning)
-                ci.done -> Triple("✓", status.success, status.onSuccess)
-                else -> null
-            }
-            badge?.let { (glyph, bg, fg) ->
+
+            if (completionFlash > 0.001f) {
                 Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(bg),
-                    contentAlignment = Alignment.Center
+                    Modifier.fillMaxSize().background(
+                        Color.White.copy(alpha = completionFlash * 0.30f)
+                    )
+                )
+            }
+
+            if (busy) {
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.36f)))
+                BusyProgressArc(
+                    modifier = Modifier.align(Alignment.Center).testTag("grid_convert_busy"),
+                    color = busyColor,
+                    diameter = 64.dp,
+                    strokeWidth = 3.dp
+                )
+                Text(
+                    if (ci.status.startsWith("重新转换")) "重新转换中…" else "转换中…",
+                    style = TextStyle(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    ),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
+                )
+                Box(
+                    Modifier.align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                        .padding(bottom = 10.dp)
                 ) {
-                    Text(glyph, color = fg, style = TextStyle(
-                        fontSize = 13.sp, fontWeight = FontWeight.Bold))
+                    GlassIndeterminateBar(height = 3.dp)
                 }
             }
+
+            ConvertStatusBadge(
+                badge = convertBadge(ci),
+                modifier = Modifier.align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .testTag("grid_convert_badge"),
+                diameter = 22.dp,
+                glyphSize = 13
+            )
+
             // 移除：48dp 触点（转换中禁用，与左滑语义一致）
             if (!busy) {
                 Box(
@@ -1074,7 +1200,8 @@ private fun ConvertItemGridCard(
                         Icon(
                             Icons.Filled.Close, "移除",
                             tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(15.dp))
+                            modifier = Modifier.size(15.dp)
+                        )
                     }
                 }
             }
@@ -1086,6 +1213,27 @@ private fun ConvertItemGridCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp)
         )
+        AnimatedContent(
+            targetState = ci.status,
+            transitionSpec = {
+                if (reduceMotion) {
+                    fadeIn(snap()) togetherWith fadeOut(snap())
+                } else {
+                    fadeIn(tween(160, easing = EaseOutStrong)) togetherWith
+                        fadeOut(tween(120))
+                }
+            },
+            label = "gridStatus"
+        ) { statusText ->
+            Text(
+                statusText,
+                style = TextStyle(fontSize = 10.sp, color = statusColor),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            )
+        }
+        Spacer(Modifier.height(6.dp))
     }
 }
 

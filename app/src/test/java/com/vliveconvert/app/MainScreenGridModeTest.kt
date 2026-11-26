@@ -1,14 +1,22 @@
 package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.ui.ConvertItem
+import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MainScreen
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import org.junit.Assert.assertEquals
@@ -36,16 +44,21 @@ class MainScreenGridModeTest {
             1L, 1_754_000_000_000L + i, 1_754_000_000L + i, 1024L * 1024 * 3))
     }
 
-    private fun setContent(n: Int) {
-        compose.setContent {
-            VLiveConvertTheme {
+    @Composable
+    private fun TestMainScreen(
+        queue: List<ConvertItem>,
+        converting: Boolean,
+        reduceMotion: Boolean = false
+    ) {
+        VLiveConvertTheme {
+            CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
                 MainScreen(
-                    items = items(n),
+                    items = queue,
                     appName = "影中影",
                     statusText = "",
-                    isConverting = false,
+                    isConverting = converting,
                     finishedBeat = false,
-                    progress = 0f,
+                    progress = if (converting) 0.5f else 0f,
                     progressDetail = "",
                     pendingRestoreCount = 0,
                     onRestoreOriginals = {},
@@ -63,13 +76,17 @@ class MainScreenGridModeTest {
                     onAddMore = {},
                     onStartConvert = {},
                     onClearAll = {},
-                    failedCount = 0,
+                    failedCount = queue.count { it.failed },
                     onRetryFailed = {},
                     onShareItem = {},
                     onRemove = {}
                 )
             }
         }
+    }
+
+    private fun setContent(n: Int) {
+        compose.setContent { TestMainScreen(items(n), converting = false) }
         compose.waitForIdle()
     }
 
@@ -117,6 +134,39 @@ class MainScreenGridModeTest {
             compose.onAllNodesWithContentDescription("IMG_2.jpg，待转换")
                 .fetchSemanticsNodes().isNotEmpty())
         // 清理，避免污染其它用例的默认视图
+        prefs().edit().remove("main_view_mode").commit()
+    }
+
+    @Test
+    fun gridConversionShowsBusyAndTerminalFeedback() {
+        prefs().edit().putString("main_view_mode", "grid").commit()
+        var queue by mutableStateOf(items(1))
+        var converting by mutableStateOf(false)
+        compose.setContent {
+            TestMainScreen(queue = queue, converting = converting, reduceMotion = true)
+        }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("IMG_1.jpg，待转换").assertExists()
+
+        compose.runOnIdle {
+            queue = listOf(queue.first().copy(status = "转换中…"))
+            converting = true
+        }
+        compose.mainClock.advanceTimeBy(250)
+        compose.waitForIdle()
+        compose.onNodeWithTag("grid_convert_busy").assertExists()
+        compose.onNodeWithContentDescription("IMG_1.jpg，转换中…").assertExists()
+
+        compose.runOnIdle {
+            queue = listOf(queue.first().copy(status = "完成", done = true))
+            converting = false
+        }
+        compose.mainClock.advanceTimeBy(700)
+        compose.waitForIdle()
+        compose.onNodeWithTag("grid_convert_busy").assertDoesNotExist()
+        compose.onNodeWithTag("grid_convert_badge").assertExists()
+        compose.onNodeWithContentDescription("IMG_1.jpg，完成").assertExists()
+
         prefs().edit().remove("main_view_mode").commit()
     }
 }
