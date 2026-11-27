@@ -7,14 +7,15 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test8) ——
-> 点开 `VivoLivePhoto-v3.0.0-test8.apk` 即可安装（**3.0 网格动效打磨版** · 单转圈/忙碌文案即时更新 +
-> 轻闪白/徽标弹入/失败抖动；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test8/VivoLivePhoto-v3.0.0-test8.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test9) ——
+> 点开 `VivoLivePhoto-v3.0.0-test9.apk` 即可安装（**3.0 苹果动效与液态玻璃打磨版** ·
+> 照片共享过渡/覆盖层返回/统一按压与状态编排/Thin-Regular-Thick 材质；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test9/VivoLivePhoto-v3.0.0-test9.apk) 下载，内容一致。
 >
-> **v3.0.0-test8**：网格忙碌态精简为单转圈，状态文案即时更新；完成闪白降至 22%/340ms，
-> 降低多张并发的动画开销；失败抖动、徽标弹入与减少动效保持不变。
-> **test1 闪退，请勿安装；test2～test7 已被本版取代。**
+> **v3.0.0-test9**：建立统一动效 token 与系统减少动效门控；网格照片到原图查看器连续共享过渡，
+> 覆盖层返回按可见层级执行，相册面板支持下拉关闭；筛选 chip 与弹窗补齐选中语义、48dp 热区和
+> 单次确认触觉；加载/空态/错误统一编排，滚动时停用缩略图与骨架循环动画。
+> **test1 闪退，请勿安装；test2～test8 已被本版取代。**
 >
 > **v3.0.0-test7**：补齐网格模式转换动效——忙碌暗幕、旋转弧、不确定进度条、状态交叉过渡、
 > 完成闪白与徽标弹入、失败抖动/触觉、网格结构动画；减少动效自动切静态。
@@ -226,6 +227,16 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
+
+### v3.0.0-test9（苹果动效系统 · 液态玻璃打磨）
+
+- 统一 MotionTokens 与系统减少动效策略，转场、状态尺寸、缩略图、原图缩放按同一门槛切换。
+- 网格照片到全屏原图接入共享元素过渡，支持中途关闭；设置子页、修复覆盖层与相册面板按可见层级处理返回。
+- 相册面板支持下拉关闭；筛选 chip、相册行与弹窗按钮补齐按压弹簧、选中语义和最小触控目标。
+- 弹窗确认增加单次 CONFIRM 触觉，退场期间屏蔽重复点击。
+- 加载、空态、错误与成功状态统一交叉过渡；骨架仅保留一个共享相位，滚动/减少动效时静态显示。
+- Thin/Regular/Thick 玻璃材质映射到透明度、压暗、模糊和折射；Thin 不进入 Backdrop 路径。
+- 正式 3.0 仍需真机视觉与性能确认。
 
 ### v3.0.0-test8（网格动效细节打磨）
 
