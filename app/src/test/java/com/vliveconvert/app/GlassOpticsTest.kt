@@ -4,9 +4,15 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.vliveconvert.app.service.GlassQuality
+import com.vliveconvert.app.ui.GlassLevel
+import com.vliveconvert.app.ui.GlassSafety
 import com.vliveconvert.app.ui.LocalGlassQuality
 import com.vliveconvert.app.ui.LocalGlassScrollPaused
+import com.vliveconvert.app.ui.glassFill
+import com.vliveconvert.app.ui.glassLevelOptics
 import com.vliveconvert.app.ui.glassOptics
+import com.vliveconvert.app.ui.shouldAnimateSkeleton
+import com.vliveconvert.app.ui.shouldAnimateThumbnailPulse
 import com.vliveconvert.app.ui.isEmulatorBuild
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,5 +79,49 @@ class GlassOpticsTest {
         compose.setContent { result = glassOptics() }
         compose.waitForIdle()
         assertEquals(Triple(1f, 1f, true), result)
+    }
+
+    @Test
+    fun thinNeverSelectsBackdrop() {
+        assertFalse(GlassSafety.allowsBackdrop(GlassLevel.Thin, 240f, hardwareAvailable = true))
+    }
+
+    @Test
+    fun materialLevelsRaiseOpacityAndDimmingMonotonically() {
+        val thin = glassFill(GlassLevel.Thin, dark = false, hazeEnabled = true, dense = false)
+        val regular = glassFill(GlassLevel.Regular, dark = false, hazeEnabled = true, dense = false)
+        val thick = glassFill(GlassLevel.Thick, dark = false, hazeEnabled = true, dense = false)
+        assertTrue(thin.top < regular.top && regular.top < thick.top)
+        assertTrue(thin.bottom < regular.bottom && regular.bottom < thick.bottom)
+        assertTrue(thin.dimming < regular.dimming && regular.dimming < thick.dimming)
+    }
+
+    @Test
+    fun regularMaterialPreservesLegacyHazeFill() {
+        val light = glassFill(GlassLevel.Regular, dark = false, hazeEnabled = true, dense = false)
+        val dark = glassFill(GlassLevel.Regular, dark = true, hazeEnabled = true, dense = false)
+        assertEquals(0.30f, light.top, 0.001f)
+        assertEquals(0.10f, light.bottom, 0.001f)
+        assertEquals(0.56f, dark.top, 0.001f)
+        assertEquals(0.42f, dark.bottom, 0.001f)
+    }
+
+    @Test
+    fun thickMaterialIsMoreDiffusedButLessRefracted() {
+        val regular = glassLevelOptics(GlassLevel.Regular)
+        val thick = glassLevelOptics(GlassLevel.Thick)
+        assertTrue(thick.blurDp > regular.blurDp)
+        assertTrue(thick.refractionAmountDp < regular.refractionAmountDp)
+        assertTrue(thick.highlightAlpha > regular.highlightAlpha)
+    }
+
+    @Test
+    fun scrollAndReduceMotionStopInfinitePlaceholderMotion() {
+        assertTrue(shouldAnimateThumbnailPulse(reduceMotion = false, scrollPaused = false))
+        assertFalse(shouldAnimateThumbnailPulse(reduceMotion = true, scrollPaused = false))
+        assertFalse(shouldAnimateThumbnailPulse(reduceMotion = false, scrollPaused = true))
+        assertTrue(shouldAnimateSkeleton(reduceMotion = false, scrollPaused = false))
+        assertFalse(shouldAnimateSkeleton(reduceMotion = true, scrollPaused = false))
+        assertFalse(shouldAnimateSkeleton(reduceMotion = false, scrollPaused = true))
     }
 }

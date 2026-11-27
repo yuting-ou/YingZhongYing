@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -29,10 +32,15 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.service.PerfPreset
 import com.vliveconvert.app.ui.GlassIconButton
+import com.vliveconvert.app.ui.GlassLevel
 import com.vliveconvert.app.ui.GlassOutlineButton
+import com.vliveconvert.app.ui.HazeGlassCard
 import com.vliveconvert.app.ui.GlossyButton
 import com.vliveconvert.app.ui.GlassPresetSelector
 import com.vliveconvert.app.ui.GlassSlider
+import com.vliveconvert.app.ui.glassBackdropSource
+import com.vliveconvert.app.ui.glassWallpaper
+import com.vliveconvert.app.ui.rememberGlassHazeState
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import org.junit.Rule
 import org.junit.Test
@@ -169,5 +177,38 @@ class GlassPressScreenshotTest {
         compose.mainClock.advanceTimeBy(700)
         compose.waitForIdle()
         shot("glass_press_glossy")
+    }
+
+    @Test
+    fun shotMaterialHierarchy() {
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                val hazeState = rememberGlassHazeState()
+                Box(
+                    Modifier.fillMaxSize()
+                        .glassWallpaper()
+                        .glassBackdropSource(hazeState)
+                        .padding(horizontal = 28.dp, vertical = 36.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        listOf(
+                            GlassLevel.Thin to "Thin · 清晰导航",
+                            GlassLevel.Regular to "Regular · 常规面板",
+                            GlassLevel.Thick to "Thick · 高对比 Dock"
+                        ).forEach { (level, label) ->
+                            HazeGlassCard(
+                                hazeState = hazeState,
+                                modifier = Modifier.fillMaxWidth().height(92.dp),
+                                level = level
+                            ) {
+                                Text(label, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        shot("glass_material_levels")
     }
 }

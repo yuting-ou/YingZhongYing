@@ -65,10 +65,14 @@ internal fun <T> StateCrossfade(
     ) { content(it) }
 }
 
+internal fun shouldAnimateSkeleton(reduceMotion: Boolean, scrollPaused: Boolean): Boolean =
+    !reduceMotion && !scrollPaused
+
 @Composable
 internal fun GlassLoadingSkeleton(modifier: Modifier = Modifier) {
     val reduceMotion = LocalReduceMotion.current
-    val shimmer = if (!reduceMotion) {
+    val scrollPaused = LocalGlassScrollPaused.current
+    val shimmer = if (shouldAnimateSkeleton(reduceMotion, scrollPaused)) {
         rememberInfiniteTransition(label = "stateSkeleton").animateFloat(
             initialValue = 0f,
             targetValue = 1f,

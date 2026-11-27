@@ -580,7 +580,8 @@ fun LocationRecoveryScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .fillMaxWidth(),
                 radius = DesignTokens.DockRadius,
-                contentPadding = PaddingValues(DesignTokens.DockPadding)
+                contentPadding = PaddingValues(DesignTokens.DockPadding),
+                level = GlassLevel.Thick
             ) {
                 if (repairing) {
                     val done = repairProgress.first

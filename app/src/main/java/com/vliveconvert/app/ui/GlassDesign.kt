@@ -371,6 +371,55 @@ internal fun glassSurfaceAlpha(dark: Boolean, dense: Boolean, liquid: Boolean): 
     else -> 0.52f
 }
 
+internal data class GlassFill(val top: Float, val bottom: Float, val dimming: Float)
+
+internal fun glassFill(
+    level: GlassLevel,
+    dark: Boolean,
+    hazeEnabled: Boolean,
+    dense: Boolean
+): GlassFill = when (level) {
+    GlassLevel.Thin -> if (hazeEnabled) {
+        GlassFill(if (dark) 0.38f else 0.18f, if (dark) 0.24f else 0.06f, 0f)
+    } else {
+        GlassFill(if (dark) 0.84f else 0.78f, if (dark) 0.72f else 0.64f, 0f)
+    }
+    GlassLevel.Regular -> if (hazeEnabled) {
+        GlassFill(
+            if (dense && dark) 0.96f else if (dense) 0.92f else if (dark) 0.56f else 0.30f,
+            if (dense && dark) 0.94f else if (dense) 0.88f else if (dark) 0.42f else 0.10f,
+            0.02f
+        )
+    } else {
+        GlassFill(if (dark) 0.92f else 0.88f, if (dark) 0.80f else 0.74f, 0.02f)
+    }
+    GlassLevel.Thick -> if (hazeEnabled) {
+        GlassFill(if (dark) 0.72f else 0.52f, if (dark) 0.58f else 0.32f, 0.08f)
+    } else {
+        GlassFill(if (dark) 0.96f else 0.94f, if (dark) 0.88f else 0.84f, 0.08f)
+    }
+}
+
+internal data class GlassLevelOptics(
+    val blurDp: Float,
+    val refractionHeightDp: Float,
+    val refractionAmountDp: Float,
+    val highlightAlpha: Float,
+    val chromatic: Boolean
+)
+
+internal fun glassLevelOptics(level: GlassLevel): GlassLevelOptics = when (level) {
+    GlassLevel.Thin -> GlassLevelOptics(18f, 14f, 26f, 0.42f, chromatic = false)
+    GlassLevel.Regular -> GlassLevelOptics(24f, 22f, 40f, 0.60f, chromatic = true)
+    GlassLevel.Thick -> GlassLevelOptics(34f, 18f, 32f, 0.74f, chromatic = true)
+}
+
+internal fun glassLevelSurfaceAlpha(level: GlassLevel, dark: Boolean): Float = when (level) {
+    GlassLevel.Thin -> if (dark) 0.42f else 0.30f
+    GlassLevel.Regular -> glassSurfaceAlpha(dark, dense = false, liquid = false)
+    GlassLevel.Thick -> if (dark) 0.86f else 0.82f
+}
+
 /** 页面内容的采样源：有折射层时用 LayerBackdrop，否则退回 Haze */
 @Composable
 fun Modifier.glassBackdropSource(hazeState: HazeState): Modifier {
@@ -411,7 +460,7 @@ fun HazeGlassCard(
         hardwareAvailable = hazeAvailable()
     )
     if (useBackdrop) {
-        LensGlassCard(backdrop!!, measuredModifier, radius, contentPadding, dense, liquid, content)
+        LensGlassCard(backdrop!!, measuredModifier, radius, contentPadding, dense, liquid, level, content)
         return
     }
     val hazeEnabled = hazeAvailable()
@@ -419,29 +468,9 @@ fun HazeGlassCard(
     val shape = continuousShape(radius)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
     // 有真实模糊时白膜必须更薄，否则会把背景糊成一块白板
-    val fillTop = base.copy(alpha = if (hazeEnabled) {
-        // 深色主题要走「暗烟玻璃」：照片的高亮会透上来，浅色文字必须压暗底才能读。
-        // 弹窗（dense）文字密集，比浮动 Dock 更不透明，避免背后大字透上来抢读。
-        when {
-            dense && dark -> 0.96f
-            dense -> 0.92f
-            dark -> 0.56f
-            else -> 0.30f
-        }
-    } else {
-        // 非硬件加速回退：浮动 Dock 会压在列表上，必须足够不透明才不露出底下文字
-        if (dark) 0.92f else 0.88f
-    })
-    val fillBottom = base.copy(alpha = if (hazeEnabled) {
-        when {
-            dense && dark -> 0.94f
-            dense -> 0.88f
-            dark -> 0.42f
-            else -> 0.10f
-        }
-    } else {
-        if (dark) 0.80f else 0.74f
-    })
+    val fill = glassFill(resolvedLevel, dark, hazeEnabled, dense)
+    val fillTop = base.copy(alpha = fill.top)
+    val fillBottom = base.copy(alpha = fill.bottom)
     val edgeTop = Color.White.copy(alpha = if (dark) 0.26f else 0.95f)
     val edgeBottom = Color.White.copy(alpha = if (dark) 0.06f else 0.26f)
     Box(
@@ -453,12 +482,19 @@ fun HazeGlassCard(
     ) {
         if (hazeEnabled) {
             val (hazeBlurScale, _, _) = glassOptics()
-            val blurStyle = remember(dark, dense, base, hazeBlurScale) {
+            val blurStyle = remember(dark, dense, base, hazeBlurScale, level, fill.dimming) {
                 HazeBlurStyle {
-                    blurRadius((if (dense) 40.dp else 24.dp) * hazeBlurScale)
+                    val blurRadius = if (level != null) {
+                        glassLevelOptics(level).blurDp.dp * hazeBlurScale
+                    } else {
+                        (if (dense) 40.dp else 24.dp) * hazeBlurScale
+                    }
+                    blurRadius(blurRadius)
                     noiseFactor(0.05f)
                     colorEffects(
-                        listOf(HazeColorEffect.tint(base.copy(alpha = if (dark) 0.20f else 0.06f)))
+                        listOf(HazeColorEffect.tint(base.copy(
+                            alpha = (if (dark) 0.20f else 0.06f) + fill.dimming
+                        )))
                     )
                     fallbackColorEffect(
                         HazeColorEffect.tint(base.copy(alpha = if (dark) 0.72f else 0.62f))
@@ -496,32 +532,40 @@ private fun LensGlassCard(
     contentPadding: PaddingValues,
     dense: Boolean,
     liquid: Boolean,
+    level: GlassLevel?,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val dark = isDarkGlass()
     val shape = continuousShape(radius)
     val base = if (dark) MaterialTheme.colorScheme.surfaceContainerHigh else Color.White
     // 玻璃中心要留出显示背景的余量；文字密集的弹窗膜更厚
-    val surfaceAlpha = glassSurfaceAlpha(dark, dense, liquid)
+    val surfaceAlpha = if (level != null) glassLevelSurfaceAlpha(level, dark)
+    else glassSurfaceAlpha(dark, dense, liquid)
     // 画质档位/滚动降成本：只缩放光学强度，默认(1,1)与旧观感完全一致
     val (blurScale, lensScale, chromaticOn) = glassOptics()
+    val material = level?.let { glassLevelOptics(it) }
     // 液态 Dock：边缘透镜更深（折射高度/位移更大）、更清澈（模糊更少）、高光更锐
-    val blurRadius = when {
+    val blurRadius = (material?.blurDp?.dp ?: when {
         dense -> 18.dp
         liquid -> 14.dp
         else -> 18.dp
-    } * blurScale
-    val refractionHeight = when {
+    }) * blurScale
+    val refractionHeight = (material?.refractionHeightDp?.dp ?: when {
         dense -> 24.dp
         liquid -> 28.dp
         else -> 22.dp
-    } * lensScale
-    val refractionAmount = when {
+    }) * lensScale
+    val refractionAmount = (material?.refractionAmountDp?.dp ?: when {
         dense -> 44.dp
         liquid -> 52.dp
         else -> 40.dp
-    } * lensScale
-    val highlight = if (dense) {
+    }) * lensScale
+    val highlight = if (material != null) {
+        Highlight.Default.copy(
+            width = if (level == GlassLevel.Thin) 0.8.dp else 1.2.dp,
+            alpha = if (dark) material.highlightAlpha * 0.78f else material.highlightAlpha
+        )
+    } else if (dense) {
         Highlight.Plain.copy(width = 0.8.dp,
             alpha = if (dark) 0.28f else 0.36f)
     } else {
@@ -552,7 +596,7 @@ private fun LensGlassCard(
                         refractionHeight = refractionHeight.toPx(),
                         refractionAmount = refractionAmount.toPx(),
                         depthEffect = true,
-                        chromaticAberration = chromaticOn && !dense
+                        chromaticAberration = chromaticOn && (material?.chromatic ?: !dense)
                     )
                 }
                 if (dense && !dark) {
@@ -662,7 +706,8 @@ fun GlassDialog(
                 .pointerInput(Unit) { detectTapGestures { } },
             radius = 28.dp,
             contentPadding = PaddingValues(20.dp),
-            dense = true
+            dense = true,
+            level = GlassLevel.Thick
         ) {
             Column(
                 Modifier

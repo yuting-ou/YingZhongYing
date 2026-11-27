@@ -390,7 +390,8 @@ fun FixTimeScreen(
                 hazeState = hazeState,
                 modifier = Modifier.fillMaxWidth(),
                 radius = 28.dp,
-                contentPadding = PaddingValues(DesignTokens.DockPadding)
+                contentPadding = PaddingValues(DesignTokens.DockPadding),
+                level = GlassLevel.Thick
             ) {
                 if (isFixing) {
                     GlassProgressBar(

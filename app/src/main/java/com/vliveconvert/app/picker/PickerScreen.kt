@@ -131,6 +131,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import com.vliveconvert.app.ui.CircleTriCheckbox
 import com.vliveconvert.app.ui.GlassDivider
+import com.vliveconvert.app.ui.GlassLevel
 import com.vliveconvert.app.ui.GlassScrollPauseScope
 import com.vliveconvert.app.ui.GlossyButton
 import com.vliveconvert.app.ui.GlassTextField
@@ -499,7 +500,8 @@ fun PickerScreen(
                         if (h != headerHeight) headerHeight = h
                     },
                 radius = 28.dp,
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                level = GlassLevel.Thin
             ) {
                 Box(
                     Modifier.fillMaxWidth().heightIn(min = 40.dp),
@@ -685,7 +687,8 @@ fun PickerScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .fillMaxWidth(),
             radius = 28.dp,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            level = GlassLevel.Thick
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (emptyAddHint && selected.isEmpty()) {
@@ -801,7 +804,8 @@ private fun AlbumSheet(
                 .testTag("album_sheet")
                 .pointerInput(Unit) { detectTapGestures { } },
             radius = 28.dp,
-            contentPadding = PaddingValues(16.dp)
+            contentPadding = PaddingValues(16.dp),
+            level = GlassLevel.Thick
         ) {
             Row(
                 Modifier

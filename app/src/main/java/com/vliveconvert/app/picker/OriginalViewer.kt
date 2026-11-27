@@ -88,6 +88,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.vliveconvert.app.ui.GlassIconButton
+import com.vliveconvert.app.ui.GlassLevel
 import com.vliveconvert.app.ui.GlossyButton
 import com.vliveconvert.app.ui.HazeGlassCard
 import com.vliveconvert.app.ui.LocalReduceMotion
@@ -324,7 +325,8 @@ internal fun SharedTransitionScope.OriginalViewer(
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             radius = 28.dp,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            level = GlassLevel.Regular
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 GlassIconButton(
@@ -371,7 +373,8 @@ internal fun SharedTransitionScope.OriginalViewer(
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             radius = 28.dp,
-            contentPadding = PaddingValues(DesignTokens.DockPadding)
+            contentPadding = PaddingValues(DesignTokens.DockPadding),
+            level = GlassLevel.Thick
         ) {
             Column {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

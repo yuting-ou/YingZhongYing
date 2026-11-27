@@ -351,7 +351,8 @@ fun BrokenRepairScreen(onBack: () -> Unit, hazeState: HazeState = rememberGlassH
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .fillMaxWidth(),
             radius = 28.dp,
-            contentPadding = PaddingValues(DesignTokens.DockPadding)
+            contentPadding = PaddingValues(DesignTokens.DockPadding),
+            level = GlassLevel.Thick
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GlassOutlineButton(
