@@ -114,6 +114,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vliveconvert.app.R
 import com.vliveconvert.app.ui.theme.statusColors
+import com.vliveconvert.app.ui.motion.MotionTokens
 import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.ui.theme.DesignTokens
 
@@ -543,7 +544,7 @@ fun MainScreen(
                         } else {
                             fadeIn(tween(200, easing = EaseOutStrong)) togetherWith fadeOut(tween(150))
                         }
-                        crossfade using SizeTransform(clip = false)
+                        crossfade using MotionTokens.stateSizeTransform(reduceMotion)
                     },
                     label = "bottomBar"
                 ) { barState ->

@@ -7,6 +7,7 @@ import android.util.LruCache
 import android.util.Size
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -152,6 +153,7 @@ val thumbDispatcher: CoroutineDispatcher get() = ThumbConcurrency.current
  */
 @Composable
 fun MediaThumbnail(uri: Uri, resolver: ContentResolver, modifier: Modifier) {
+    val reduceMotion = LocalReduceMotion.current
     var failed by remember(uri) { mutableStateOf(false) }
     val bitmap by produceState<Bitmap?>(null, uri) {
         val key = uri.toString()
@@ -181,9 +183,10 @@ fun MediaThumbnail(uri: Uri, resolver: ContentResolver, modifier: Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
         AnimatedVisibility(
             visible = bitmap != null,
-            enter = fadeIn(tween(200, easing = EaseOutStrong)) +
+            enter = if (reduceMotion) fadeIn(snap())
+            else fadeIn(tween(200, easing = EaseOutStrong)) +
                 scaleIn(tween(240, easing = EaseOutStrong), initialScale = 0.92f),
-            exit = fadeOut(tween(140))
+            exit = if (reduceMotion) fadeOut(snap()) else fadeOut(tween(140))
         ) {
             if (bitmap != null) {
                 Image(
@@ -209,7 +212,7 @@ fun MediaThumbnail(uri: Uri, resolver: ContentResolver, modifier: Modifier) {
         // 加载占位：呼吸底色 + 淡淡的「照片」字形。
         // 只给一块灰板会让人以为「这里本来就空」，画上轮廓才读得出是在等缩略图
         if (bitmap == null && !failed) {
-            val pulse = if (LocalReduceMotion.current) 0.65f
+            val pulse = if (reduceMotion) 0.65f
             else rememberInfiniteTransition(label = "thumbPulse").animateFloat(
                 initialValue = 0.45f,
                 targetValue = 0.9f,

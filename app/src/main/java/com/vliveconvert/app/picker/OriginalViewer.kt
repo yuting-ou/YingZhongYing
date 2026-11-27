@@ -11,8 +11,11 @@ import android.util.LruCache
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +66,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -81,6 +86,7 @@ import androidx.core.view.WindowCompat
 import com.vliveconvert.app.ui.GlassIconButton
 import com.vliveconvert.app.ui.GlossyButton
 import com.vliveconvert.app.ui.HazeGlassCard
+import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MediaThumbnail
 import com.vliveconvert.app.ui.theme.DesignTokens
 import com.vliveconvert.app.ui.glassBackdropSource
@@ -107,6 +113,9 @@ internal fun OriginalViewer(
     if (items.isEmpty()) return
 
     val context = LocalContext.current
+    val reduceMotion = LocalReduceMotion.current
+    val zoomScaleSpec: FiniteAnimationSpec<Float> = if (reduceMotion) snap() else tween(ZOOM_MS)
+    val zoomOffsetSpec: FiniteAnimationSpec<Offset> = if (reduceMotion) snap() else tween(ZOOM_MS)
     val pager = rememberPagerState(
         initialPage = initialIndex.coerceIn(0, items.lastIndex),
         pageCount = { items.size }
@@ -128,8 +137,8 @@ internal fun OriginalViewer(
         zoomed = false
         scope.launch {
             coroutineScope {
-                launch { scale.animateTo(1f, tween(ZOOM_MS)) }
-                launch { offset.animateTo(Offset.Zero, tween(ZOOM_MS)) }
+                launch { scale.animateTo(1f, zoomScaleSpec) }
+                launch { offset.animateTo(Offset.Zero, zoomOffsetSpec) }
             }
         }
     }
@@ -223,9 +232,9 @@ internal fun OriginalViewer(
                                         if (liveScale > 1.01f) {
                                             zoomed = false
                                             coroutineScope {
-                                                launch { scale.animateTo(1f, tween(ZOOM_MS)) }
+                                                launch { scale.animateTo(1f, zoomScaleSpec) }
                                                 launch {
-                                                    offset.animateTo(Offset.Zero, tween(ZOOM_MS))
+                                                    offset.animateTo(Offset.Zero, zoomOffsetSpec)
                                                 }
                                             }
                                         } else {
@@ -237,9 +246,9 @@ internal fun OriginalViewer(
                                             // 先放大再平移会把锚点甩出手指，看起来就是「缩放时图片跑偏」
                                             coroutineScope {
                                                 launch {
-                                                    scale.animateTo(DOUBLE_TAP_SCALE, tween(ZOOM_MS))
+                                                    scale.animateTo(DOUBLE_TAP_SCALE, zoomScaleSpec)
                                                 }
-                                                launch { offset.animateTo(target, tween(ZOOM_MS)) }
+                                                launch { offset.animateTo(target, zoomOffsetSpec) }
                                             }
                                         }
                                     }
@@ -375,6 +384,7 @@ private fun OriginalPage(
     onImageSize: (IntSize) -> Unit
 ) {
     val context = LocalContext.current
+    val reduceMotion = LocalReduceMotion.current
     var attempt by remember(item.uri) { mutableIntStateOf(0) }
     val state by produceState<OriginalLoadState>(OriginalLoadState.Loading, item.uri, attempt) {
         value = OriginalLoadState.Loading
@@ -389,15 +399,38 @@ private fun OriginalPage(
         }
     }
 
-    Crossfade(targetState = state, animationSpec = tween(220), label = "originalImage") { s ->
+    Crossfade(
+        targetState = state,
+        animationSpec = if (reduceMotion) snap() else tween(220),
+        label = "originalImage"
+    ) { s ->
         when (s) {
             OriginalLoadState.Loading -> Box(modifier, contentAlignment = Alignment.Center) {
                 MediaThumbnail(item.uri, context.contentResolver, Modifier.fillMaxSize().alpha(0.32f))
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 3.dp,
-                    modifier = Modifier.size(32.dp)
-                )
+                if (reduceMotion) {
+                    Canvas(Modifier.size(32.dp)) {
+                        val stroke = 3.dp.toPx()
+                        val inset = stroke / 2f
+                        drawArc(
+                            color = Color.White,
+                            startAngle = -90f,
+                            sweepAngle = 110f,
+                            useCenter = false,
+                            topLeft = Offset(inset, inset),
+                            size = androidx.compose.ui.geometry.Size(
+                                size.width - inset * 2f,
+                                size.height - inset * 2f
+                            ),
+                            style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        )
+                    }
+                } else {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
             is OriginalLoadState.Ready -> {
                 val bitmap = s.bitmap

@@ -84,6 +84,7 @@ import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.service.applyPreset
 import com.vliveconvert.app.service.matchingPreset
 import com.vliveconvert.app.ui.theme.DesignTokens
+import com.vliveconvert.app.ui.motion.MotionTokens
 
 @Composable
 internal fun SettingsScreen(
@@ -218,7 +219,7 @@ internal fun SettingsScreen(
                                 (fadeIn(tween(220, easing = EaseOutStrong)) +
                                     slideInVertically(tween(220, easing = EaseOutStrong)) { it / 6 }
                                 ) togetherWith
-                                    (fadeOut(tween(140))) using SizeTransform(clip = false)
+                                    (fadeOut(tween(140))) using MotionTokens.stateSizeTransform(reduceMotion)
                             }
                         },
                         label = "perfModeSwitch"
