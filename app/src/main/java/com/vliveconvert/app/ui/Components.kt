@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import com.vliveconvert.app.ui.motion.MotionTokens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -94,9 +95,7 @@ internal fun rememberPressScale(
     return androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = if (reduceMotion) androidx.compose.animation.core.snap()
-        else androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessHigh),
+        else MotionTokens.Snappy,
         label = "pressScale"
     )
 }
@@ -349,12 +348,14 @@ fun CircleTriCheckbox(
  */
 internal fun Modifier.clickableNoRipple(
     onClick: () -> Unit,
-    interactionSource: MutableInteractionSource? = null
+    interactionSource: MutableInteractionSource? = null,
+    enabled: Boolean = true
 ): Modifier = composed {
     val source = interactionSource ?: remember { MutableInteractionSource() }
     clickable(
         interactionSource = source,
         indication = null,
+        enabled = enabled,
         onClick = onClick
     )
 }

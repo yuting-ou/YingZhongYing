@@ -2,7 +2,11 @@ package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -94,6 +98,50 @@ class GlassDialogExitTest {
         compose.onNodeWithText("确定").performClick()
         compose.mainClock.advanceTimeBy(400)
         assertEquals("再次点击必须还能触发确认", 2, confirmed)
+    }
+
+    private class RecordingHapticFeedback : HapticFeedback {
+        val types = mutableListOf<HapticFeedbackType>()
+        override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
+            types.add(hapticFeedbackType)
+        }
+    }
+
+    @Test
+    fun confirm_emitsOneHapticAndIgnoresRepeatedPressDuringExit() {
+        compose.mainClock.autoAdvance = false
+        val haptics = RecordingHapticFeedback()
+        var confirmed = 0
+        val open = mutableStateOf(true)
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                CompositionLocalProvider(LocalHapticFeedback provides haptics) {
+                    if (open.value) {
+                        GlassDialog(
+                            hazeState = rememberGlassHazeState(),
+                            onDismissRequest = { open.value = false },
+                            title = "准备转换",
+                            confirmLabel = "开始",
+                            onConfirm = {
+                                confirmed++
+                                open.value = false
+                            }
+                        ) {
+                            Text("正文")
+                        }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(800)
+
+        compose.onNodeWithText("开始").performClick()
+        compose.onNodeWithText("开始").performClick()
+        compose.mainClock.advanceTimeBy(300)
+
+        assertEquals("退场期间的重复点击不得重复执行确认", 1, confirmed)
+        assertEquals("一次确认只产生一次触觉", 1, haptics.types.size)
+        assertEquals(HapticFeedbackType.Confirm, haptics.types.single())
     }
 
     @Test

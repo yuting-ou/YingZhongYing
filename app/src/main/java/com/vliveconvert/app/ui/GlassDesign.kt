@@ -58,6 +58,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.clipRect
 import com.vliveconvert.app.ui.theme.DesignTokens
 import com.vliveconvert.app.ui.theme.statusColors
+import com.vliveconvert.app.ui.motion.MotionTokens
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -99,6 +101,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import android.os.Build
 import com.kyant.backdrop.backdrops.LayerBackdrop
@@ -601,6 +604,7 @@ fun GlassDialog(
 ) {
     val dark = isDarkGlass()
     val reduceMotion = LocalReduceMotion.current
+    val hapticFeedback = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val latestOnDismiss = rememberUpdatedState(onDismissRequest)
     val latestOnConfirm = rememberUpdatedState(onConfirm)
@@ -693,9 +697,12 @@ fun GlassDialog(
                         Spacer(Modifier.width(6.dp))
                     }
                     if (confirmLabel != null) {
-                        GlassDialogPrimaryButton(confirmLabel) {
-                            latestOnConfirm.value?.let { action ->
-                                dismissThen { action() }
+                        GlassDialogPrimaryButton(confirmLabel, enabled = !dismissing) {
+                            if (!dismissing) {
+                                latestOnConfirm.value?.let { action ->
+                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
+                                    dismissThen { action() }
+                                }
                             }
                         }
                     }
@@ -706,14 +713,20 @@ fun GlassDialog(
 }
 
 @Composable
-private fun GlassDialogPrimaryButton(text: String, onClick: () -> Unit) {
+private fun GlassDialogPrimaryButton(text: String, enabled: Boolean, onClick: () -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     val contentColor = if (primary.luminance() > 0.42f)
         MaterialTheme.colorScheme.onPrimary else Color.White
     val interaction = remember { MutableInteractionSource() }
+    val pressScale by rememberPressScale(interaction, pressedScale = 0.97f)
     Box(
         Modifier
-            .heightIn(min = 40.dp)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+                alpha = if (enabled) 1f else 0.55f
+            }
+            .heightIn(min = 48.dp)
             .clip(CircleShape)
             .shadow(10.dp, CircleShape, clip = false,
                 ambientColor = primary.copy(alpha = 0.35f),
@@ -721,8 +734,7 @@ private fun GlassDialogPrimaryButton(text: String, onClick: () -> Unit) {
             .background(Brush.verticalGradient(listOf(
                 lerp(primary, Color.White, 0.18f), primary)))
             .border(1.dp, Color.White.copy(alpha = 0.60f), CircleShape)
-            .clickable(interactionSource = interaction,
-                indication = LocalIndication.current, onClick = onClick)
+            .clickableNoRipple(onClick, interaction, enabled)
             .padding(horizontal = 18.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -734,12 +746,16 @@ private fun GlassDialogPrimaryButton(text: String, onClick: () -> Unit) {
 @Composable
 private fun GlassDialogSecondaryButton(text: String, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
+    val pressScale by rememberPressScale(interaction, pressedScale = 0.98f)
     Box(
         Modifier
-            .heightIn(min = 40.dp)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .heightIn(min = 48.dp)
             .clip(CircleShape)
-            .clickable(interactionSource = interaction,
-                indication = LocalIndication.current, onClick = onClick)
+            .clickableNoRipple(onClick, interaction)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center
     ) {

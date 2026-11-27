@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -118,6 +119,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
@@ -902,13 +904,37 @@ private fun AlbumSheetRow(
     onClick: () -> Unit
 ) {
     val resolver = LocalContext.current.contentResolver
+    val reduceMotion = LocalReduceMotion.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressScale by rememberPressScale(interaction, pressedScale = 0.98f)
+    val selectedScale by animateFloatAsState(
+        targetValue = if (selected) 0.99f else 1f,
+        animationSpec = if (reduceMotion) snap() else MotionTokens.Snappy,
+        label = "albumSelectedScale"
+    )
+    val background by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        else Color.Transparent,
+        animationSpec = if (reduceMotion) snap() else tween(MotionTokens.FastMs),
+        label = "albumBackground"
+    )
     Row(
         Modifier
             .fillMaxWidth()
+            .testTag("album_chip_${album.bucketId}")
+            .graphicsLayer {
+                scaleX = selectedScale * pressScale
+                scaleY = selectedScale * pressScale
+            }
             .clip(continuousShape(12.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        else Color.Transparent)
-            .clickable(onClick = onClick)
+            .background(background)
+            .selectable(
+                selected = selected,
+                role = Role.Tab,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1042,15 +1068,38 @@ private fun SharedTransitionScope.AlbumGridPage(
 /** 选择器小 chip：范围/日期筛选（选中态用主题色浅底） */
 @Composable
 private fun PickerChip(text: String, active: Boolean, onClick: () -> Unit) {
+    val reduceMotion = LocalReduceMotion.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressScale by rememberPressScale(interaction, pressedScale = 0.96f)
+    val selectedScale by animateFloatAsState(
+        targetValue = if (active) 0.98f else 1f,
+        animationSpec = if (reduceMotion) snap() else MotionTokens.Snappy,
+        label = "chipSelectedScale"
+    )
+    val background by animateColorAsState(
+        targetValue = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        else Color.Transparent,
+        animationSpec = if (reduceMotion) snap() else tween(MotionTokens.FastMs),
+        label = "chipBackground"
+    )
     Box(
         Modifier
+            .graphicsLayer {
+                scaleX = selectedScale * pressScale
+                scaleY = selectedScale * pressScale
+            }
+            .heightIn(min = 48.dp)
             .clip(continuousShape(8.dp))
-            .background(
-                if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                else Color.Transparent
+            .background(background)
+            .selectable(
+                selected = active,
+                role = Role.Tab,
+                interactionSource = interaction,
+                indication = null,
+                onClick = onClick
             )
-            .clickableNoRipple(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text,
