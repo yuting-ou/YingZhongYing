@@ -1882,6 +1882,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 系统“移除动画”可能在后台被修改，回到前台立即刷新统一动效判据
+        MotionPrefs.refreshSystem(this)
         // 从系统设置授予/收回位置权限后返回时刷新警示条状态
         locationDenied = !hasMediaLocationPermission()
         // 回到前台补一次系统栏图标明暗（闪屏退场/系统栏重建可能覆盖）

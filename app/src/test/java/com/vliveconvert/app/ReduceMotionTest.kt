@@ -1,6 +1,7 @@
 package com.vliveconvert.app
 
 import android.content.Context
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
@@ -121,5 +122,22 @@ class ReduceMotionTest {
         assertTrue("系统移除动画必须自动等效开启", MotionPrefs.effective)
         MotionPrefs.systemAnimatorOff = false
         assertFalse(MotionPrefs.effective)
+    }
+
+    @Test
+    fun refreshSystemReadsAnimatorDurationScale() {
+        MotionPrefs.set(app, false)
+        try {
+            Settings.Global.putFloat(app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 0f)
+            MotionPrefs.refreshSystem(app)
+            assertTrue(MotionPrefs.effective)
+
+            Settings.Global.putFloat(app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+            MotionPrefs.refreshSystem(app)
+            assertFalse(MotionPrefs.effective)
+        } finally {
+            Settings.Global.putFloat(app.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+            MotionPrefs.refreshSystem(app)
+        }
     }
 }
