@@ -67,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import kotlinx.coroutines.launch
+import kotlin.math.min
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,6 +88,7 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -96,6 +98,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import android.os.Build
 import com.kyant.backdrop.backdrops.LayerBackdrop
@@ -388,11 +391,24 @@ fun HazeGlassCard(
     dense: Boolean = false,
     /** 浮动 Dock 专用：更深的边缘透镜 + 跟随触点的镜面高光（「更液态」） */
     liquid: Boolean = false,
+    /** 语义材质层级；null 保持既有 dense/liquid 调用方行为 */
+    level: GlassLevel? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val backdrop = LocalGlassBackdrop.current
-    if (backdrop != null && hazeAvailable()) {
-        LensGlassCard(backdrop, modifier, radius, contentPadding, dense, liquid, content)
+    val resolvedLevel = GlassSafety.resolveLevel(dense, liquid, level)
+    val density = LocalDensity.current
+    var shortSideDp by remember { mutableStateOf(0f) }
+    val measuredModifier = modifier.onSizeChanged { size ->
+        shortSideDp = with(density) { min(size.width, size.height).toDp().value }
+    }
+    val useBackdrop = backdrop != null && GlassSafety.allowsBackdrop(
+        level = resolvedLevel,
+        shortSideDp = shortSideDp,
+        hardwareAvailable = hazeAvailable()
+    )
+    if (useBackdrop) {
+        LensGlassCard(backdrop!!, measuredModifier, radius, contentPadding, dense, liquid, content)
         return
     }
     val hazeEnabled = hazeAvailable()
@@ -426,7 +442,7 @@ fun HazeGlassCard(
     val edgeTop = Color.White.copy(alpha = if (dark) 0.26f else 0.95f)
     val edgeBottom = Color.White.copy(alpha = if (dark) 0.06f else 0.26f)
     Box(
-        modifier
+        measuredModifier
             .shadow(18.dp, shape, clip = false,
                 ambientColor = Color.Black.copy(alpha = if (dark) 0.45f else 0.16f),
                 spotColor = Color.Black.copy(alpha = if (dark) 0.30f else 0.12f))
