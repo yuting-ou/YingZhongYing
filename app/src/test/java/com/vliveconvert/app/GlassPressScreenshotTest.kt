@@ -180,6 +180,39 @@ class GlassPressScreenshotTest {
     }
 
     @Test
+    fun shotMaterialHierarchyDark() {
+        compose.setContent {
+            VLiveConvertTheme(darkTheme = true, dynamicColor = false) {
+                val hazeState = rememberGlassHazeState()
+                Box(
+                    Modifier.fillMaxSize()
+                        .glassWallpaper()
+                        .glassBackdropSource(hazeState)
+                        .padding(horizontal = 28.dp, vertical = 36.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        listOf(
+                            GlassLevel.Thin to "Thin · 清晰导航",
+                            GlassLevel.Regular to "常规面板",
+                            GlassLevel.Thick to "Thick · 高对比 Dock"
+                        ).forEach { (level, label) ->
+                            HazeGlassCard(
+                                hazeState = hazeState,
+                                modifier = Modifier.fillMaxWidth().height(92.dp),
+                                level = level
+                            ) {
+                                Text(label, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        shot("glass_material_bc_dark")
+    }
+
+    @Test
     fun shotMaterialHierarchy() {
         compose.setContent {
             VLiveConvertTheme(dynamicColor = false) {
@@ -209,6 +242,6 @@ class GlassPressScreenshotTest {
             }
         }
         compose.waitForIdle()
-        shot("glass_material_levels")
+        shot("glass_material_bc_light")
     }
 }

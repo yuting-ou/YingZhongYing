@@ -55,6 +55,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import com.vliveconvert.app.ui.theme.DesignTokens
 import com.vliveconvert.app.ui.theme.statusColors
@@ -380,7 +381,7 @@ internal fun glassFill(
     dense: Boolean
 ): GlassFill = when (level) {
     GlassLevel.Thin -> if (hazeEnabled) {
-        GlassFill(if (dark) 0.38f else 0.18f, if (dark) 0.24f else 0.06f, 0f)
+        GlassFill(if (dark) 0.30f else 0.14f, if (dark) 0.18f else 0.04f, 0f)
     } else {
         GlassFill(if (dark) 0.84f else 0.78f, if (dark) 0.72f else 0.64f, 0f)
     }
@@ -394,7 +395,7 @@ internal fun glassFill(
         GlassFill(if (dark) 0.92f else 0.88f, if (dark) 0.80f else 0.74f, 0.02f)
     }
     GlassLevel.Thick -> if (hazeEnabled) {
-        GlassFill(if (dark) 0.72f else 0.52f, if (dark) 0.58f else 0.32f, 0.08f)
+        GlassFill(if (dark) 0.78f else 0.58f, if (dark) 0.64f else 0.36f, 0.10f)
     } else {
         GlassFill(if (dark) 0.96f else 0.94f, if (dark) 0.88f else 0.84f, 0.08f)
     }
@@ -405,19 +406,45 @@ internal data class GlassLevelOptics(
     val refractionHeightDp: Float,
     val refractionAmountDp: Float,
     val highlightAlpha: Float,
-    val chromatic: Boolean
+    val chromatic: Boolean,
+    val edgeDispersion: Float
 )
 
 internal fun glassLevelOptics(level: GlassLevel): GlassLevelOptics = when (level) {
-    GlassLevel.Thin -> GlassLevelOptics(18f, 14f, 26f, 0.42f, chromatic = false)
-    GlassLevel.Regular -> GlassLevelOptics(24f, 22f, 40f, 0.60f, chromatic = true)
-    GlassLevel.Thick -> GlassLevelOptics(34f, 18f, 32f, 0.74f, chromatic = true)
+    GlassLevel.Thin -> GlassLevelOptics(18f, 14f, 26f, 0.42f, chromatic = false, edgeDispersion = 0f)
+    GlassLevel.Regular -> GlassLevelOptics(24f, 22f, 40f, 0.62f, chromatic = true, edgeDispersion = 0.35f)
+    GlassLevel.Thick -> GlassLevelOptics(32f, 18f, 34f, 0.82f, chromatic = true, edgeDispersion = 0.65f)
 }
 
 internal fun glassLevelSurfaceAlpha(level: GlassLevel, dark: Boolean): Float = when (level) {
-    GlassLevel.Thin -> if (dark) 0.42f else 0.30f
+    GlassLevel.Thin -> if (dark) 0.34f else 0.24f
     GlassLevel.Regular -> glassSurfaceAlpha(dark, dense = false, liquid = false)
-    GlassLevel.Thick -> if (dark) 0.86f else 0.82f
+    GlassLevel.Thick -> if (dark) 0.88f else 0.84f
+}
+
+@Composable
+internal fun Modifier.glassEdgeDispersion(level: GlassLevel): Modifier {
+    val material = glassLevelOptics(level)
+    val (_, _, chromaticOn) = glassOptics()
+    if (!material.chromatic || !chromaticOn || LocalGlassCompatibility.current) return this
+    val strength = material.edgeDispersion
+    val cool = Color(0xFF6AD9FF).copy(alpha = 0.34f * strength)
+    val warm = Color(0xFFFF8FB7).copy(alpha = 0.30f * strength)
+    return drawBehind {
+        val stroke = 1.4.dp.toPx()
+        val radius = size.minDimension * 0.28f
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                listOf(cool, Color.Transparent, Color.Transparent, warm),
+                startY = 0f,
+                endY = size.height
+            ),
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = CornerRadius(radius, radius),
+            style = Stroke(width = stroke)
+        )
+    }
 }
 
 /** 页面内容的采样源：有折射层时用 LayerBackdrop，否则退回 Haze */
@@ -512,6 +539,7 @@ fun HazeGlassCard(
         Box(Modifier.matchParentSize().border(1.dp, Brush.verticalGradient(
             listOf(edgeTop, edgeBottom,
                 Color.White.copy(alpha = if (dark) 0.10f else 0.55f))), shape))
+        Box(Modifier.matchParentSize().glassEdgeDispersion(level ?: resolvedLevel))
         if (liquid) {
             Box(Modifier.matchParentSize().touchFollowGlow())
         }
@@ -622,6 +650,7 @@ private fun LensGlassCard(
             }
         )
     ) {
+        Box(Modifier.matchParentSize().glassEdgeDispersion(level ?: GlassSafety.resolveLevel(dense, liquid, null)))
         if (liquid) {
             Box(Modifier.matchParentSize().touchFollowGlow())
         }

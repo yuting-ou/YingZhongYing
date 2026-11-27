@@ -116,6 +116,17 @@ class GlassOpticsTest {
     }
 
     @Test
+    fun bcMaterialEdgeDispersionIsSemanticNotRainbow() {
+        val thin = glassLevelOptics(GlassLevel.Thin)
+        val regular = glassLevelOptics(GlassLevel.Regular)
+        val thick = glassLevelOptics(GlassLevel.Thick)
+        assertEquals(0f, thin.edgeDispersion, 0.001f)
+        assertTrue(regular.edgeDispersion in 0.25f..0.45f)
+        assertTrue(thick.edgeDispersion in 0.55f..0.75f)
+        assertTrue(thick.edgeDispersion > regular.edgeDispersion)
+    }
+
+    @Test
     fun scrollAndReduceMotionStopInfinitePlaceholderMotion() {
         assertTrue(shouldAnimateThumbnailPulse(reduceMotion = false, scrollPaused = false))
         assertFalse(shouldAnimateThumbnailPulse(reduceMotion = true, scrollPaused = false))
