@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -23,7 +24,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -79,11 +83,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -107,6 +113,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
@@ -114,9 +121,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.vliveconvert.app.ui.CircleTriCheckbox
 import com.vliveconvert.app.ui.GlassDivider
 import com.vliveconvert.app.ui.GlassScrollPauseScope
@@ -132,6 +141,7 @@ import com.vliveconvert.app.ui.glassWallpaper
 import com.vliveconvert.app.ui.rememberGlassHazeState
 import com.vliveconvert.app.ui.rememberPressScale
 import dev.chrisbanes.haze.HazeState
+import com.vliveconvert.app.ui.motion.MotionTokens
 import com.vliveconvert.app.ui.theme.DesignTokens
 import com.vliveconvert.app.ui.MediaThumbnail
 import com.vliveconvert.app.ui.clickableNoRipple
@@ -142,6 +152,7 @@ import com.vliveconvert.app.ui.dateLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -780,6 +791,13 @@ private fun AlbumSheet(
     onSelect: (AlbumInfo) -> Unit
 ) {
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val reduceMotion = LocalReduceMotion.current
+    val scope = rememberCoroutineScope()
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val dismissThresholdPx = with(LocalDensity.current) { 96.dp.toPx() }
+    val dragState = rememberDraggableState { delta ->
+        dragOffset = (dragOffset + delta).coerceAtLeast(0f)
+    }
     BackHandler(enabled = true) { onDismiss() }
     BoxWithConstraints(
         Modifier
@@ -796,11 +814,33 @@ private fun AlbumSheet(
                 .padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                 .fillMaxWidth()
                 .heightIn(max = maxHeight * 0.72f)
+                .offset { IntOffset(0, dragOffset.roundToInt()) }
+                .testTag("album_sheet")
                 .pointerInput(Unit) { detectTapGestures { } },
             radius = 28.dp,
             contentPadding = PaddingValues(16.dp)
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .draggable(
+                        state = dragState,
+                        orientation = Orientation.Vertical,
+                        onDragStopped = {
+                            if (dragOffset >= dismissThresholdPx) {
+                                onDismiss()
+                            } else {
+                                scope.launch {
+                                    Animatable(dragOffset).animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = if (reduceMotion) snap() else MotionTokens.Standard
+                                    )
+                                }
+                            }
+                        }
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
                     "选择相册",
                     style = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold,

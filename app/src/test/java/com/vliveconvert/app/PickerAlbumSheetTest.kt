@@ -2,9 +2,13 @@ package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import com.vliveconvert.app.picker.AlbumInfo
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
@@ -17,6 +21,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.robolectric.annotation.Config
 
@@ -84,5 +89,46 @@ class PickerAlbumSheetTest {
         compose.waitForIdle()
         assertEquals("选完必须收起面板", false, sheet.value)
         compose.onNodeWithText("Screenshots · 0 张").assertExists()
+    }
+
+    @Test
+    fun albumSheet_dragDownDismisses() {
+        val bucket = 7L
+        val scanner = PickerScanner(MediaRepo(compose.activity.contentResolver))
+        val state = scanner.stateOf(bucket)
+        val item = MediaItem(
+            id = 1L, path = "/storage/emulated/0/DCIM/Camera/IMG_1.jpg",
+            name = "IMG_1.jpg", bucketId = bucket,
+            dateTaken = 1_754_000_000_000L, dateModified = 1_754_000_000L, size = 1024L
+        )
+        state.results.add(item)
+        state.total = 1
+        state.doneCount.set(1)
+        state.completed = true
+        val sheet = mutableStateOf(true)
+
+        compose.setContent {
+            PickerScreen(
+                albums = listOf(AlbumInfo(bucket, "Camera", 1, item.id, 0L)),
+                scanner = scanner,
+                scannerScope = CoroutineScope(Dispatchers.Unconfined),
+                onBack = {},
+                onConfirm = {},
+                showAlbumSheet = sheet.value,
+                onAlbumSheetChange = { sheet.value = it }
+            )
+        }
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("album_sheet").performTouchInput {
+            swipe(
+                start = Offset(center.x, 10f),
+                end = Offset(center.x, height - 10f),
+                durationMillis = 600
+            )
+        }
+        compose.mainClock.advanceTimeBy(800)
+        compose.waitForIdle()
+        assertFalse("向下拖过阈值必须关闭相册面板", sheet.value)
     }
 }

@@ -550,6 +550,8 @@ class MainActivity : ComponentActivity() {
             crashExportMessage != null -> crashExportMessage = null
             showOutputPathDialog -> showOutputPathDialog = false
             showAlbumSheet -> showAlbumSheet = false
+            showLocationRecovery -> showLocationRecovery = false
+            showBrokenRepair -> showBrokenRepair = false
         }
     }
 
@@ -1110,7 +1112,8 @@ class MainActivity : ComponentActivity() {
                     showLocationDialog ||
                     showLocationSettingsDialog || showSettingsDialog ||
                     showStatusDetail || crashExportMessage != null ||
-                    showOutputPathDialog || showAlbumSheet
+                    showOutputPathDialog || showAlbumSheet ||
+                    showLocationRecovery || showBrokenRepair
                 BackHandler(enabled = anyDialogOpen) { dismissTopDialog() }
                 PredictiveBackHandler(
                     enabled = hasReadPermission() && !ConvertCenter.isConverting &&

@@ -137,6 +137,23 @@ class BackNavigationTest {
         compose.onNodeWithText("转换后处理").assertExists()
     }
 
+    @Test
+    fun backFromBrokenRepair_landsOnSettingsInOnePress() {
+        compose.onNodeWithText("设置 ›").performClick()
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        compose.onNodeWithText("修复破损实况").performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+        assertTrue("前置条件：应已在破损修复覆盖层", flag("showBrokenRepair") && flag("showSettings"))
+
+        pressBack()
+
+        assertEquals("第一次返回必须关闭破损修复层", false, flag("showBrokenRepair"))
+        assertTrue("且应停在设置页", flag("showSettings"))
+        compose.onNodeWithText("转换后处理").assertExists()
+    }
+
     /** 选择器页：一次返回回主页（走的是新的 PredictiveBackHandler 弹层路径） */
     @Test
     fun backFromPicker_landsOnMainInOnePress() {
