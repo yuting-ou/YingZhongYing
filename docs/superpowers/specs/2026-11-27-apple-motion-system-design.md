@@ -1,231 +1,194 @@
-# 苹果 Liquid Glass 动效系统设计（A 路线）
+# 苹果 Liquid Glass 动效系统设计（A 路线 · 第一性原理优化版）
 
 - 日期：2026-11-27
 - 基线：v3.0.0-test8（versionCode 142）
 - 目标交付：v3.0.0-test9（versionCode 143）
-- 状态：待用户审阅
-- 范围：全应用设计语言、动效、导航连续性、玻璃层级、无障碍与性能门禁
+- 状态：已批准执行
+- 范围：动效连续性、交互反馈、玻璃层级、无障碍与性能安全
 
-## 1. 目标
+## 1. 第一性原理
 
-把“影中影”从已经成立的液态玻璃视觉，提升为一套可维护、可测量、可回退的苹果式动效系统：
+用户感知到的“高级动效”不是动画数量，而是四件事：
 
-- 每个操作都有短暂、精确、符合空间关系的反馈。
-- 页面、缩略图、Sheet、Dialog 的进出有连续性，不硬跳。
-- 玻璃材质有明确层级，不再靠 dense/liquid 布尔值隐式表达。
-- 动效丰富但不堆叠；减少动效、系统动画开关、高对比与读屏都有完整分支。
-- 不重新引入小尺寸 Backdrop/AGSL 崩溃路径。
-- 关键路径有 Jank/PSS/帧时间门禁，真机验收前不宣称性能完美。
+1. **因果**：画面变化必须由用户动作或数据变化解释。
+2. **连续**：同一个对象在页面/状态之间移动时，位置、尺寸、层级不能断。
+3. **克制**：同一时刻只有一个主动画层级，其他元素保持安静。
+4. **可逆**：手势取消、返回、失败都能回到稳定状态，不锁死、不闪退。
 
-## 2. 非目标
+由此得到硬约束：
 
-- 不重写转换管线、MediaStore 数据语义或删除/恢复逻辑。
-- 不默认加入传感器高光、粒子、持续彩虹辉光等不可控特效。
-- 不把内容层全部改成 Liquid Glass；玻璃只用于功能层与 transient controls。
-- 不在本轮替换 Haze/Backdrop 引擎，不做工具链再次升级。
-- 不在真机验证前发布正式 3.0。
+- 每个动效只解决一个语义问题，不重复表达。
+- 小尺寸节点不新增 Backdrop/AGSL/RenderEffect 渲染层。
+- 减少动效不是“更快”，而是去掉位移、形变、无限循环与闪白。
+- 没有真机数据，不宣称性能完美；模拟器只验证功能与视觉。
 
-## 3. 现状与证据
+## 2. 目标
 
-### 3.1 已具备
+- 主流程、设置、选择器、预览、修复页、弹窗/Sheet 的转场连续。
+- 所有可点元素反馈一致、可取消、有语义与触觉。
+- Loading/Empty/Error/Success 不硬切，状态不滞后。
+- 玻璃有 thin/regular/thick 层级，Backdrop 有尺寸安全边界。
+- 关键路径动画有性能预算，test9 可安装、可回退、可验收。
 
-- 预测返回跟手、取消回弹、提交续接；页面转场已有减少动效分支：`app/src/main/java/com/vliveconvert/app/MainActivity.kt:253,1115,1517`。
-- 主界面摘要、空态、Dock 三态、对话框对称进出已有体系：`MainScreen.kt:284,381,538`、`GlassDesign.kt:593`、`PermissionScreen.kt:57`。
-- 滑块 1:1 拖动、弹簧、速度形变、触点高光与色散：`GlassSlider.kt:117`、`GlassPresetSelector.kt:88`、`LiquidPress.kt:32`。
-- 连续圆角、CJK 字阶、减少动效持久化、硬件/模拟器回退与原生崩溃自动降级：`ContinuousShape.kt:17`、`Type.kt:24`、`MotionPrefs.kt:18`、`GlassCrashSafety.kt:12`。
+## 3. 非目标与主动砍掉
 
-### 3.2 系统性缺口
+- 不重写转换管线、MediaStore、删除/恢复语义。
+- 不做全新导航框架；扩展现有 Screen/覆盖层逻辑。
+- 不默认加入传感器高光、粒子、持续彩虹辉光。
+- 不在 test9 引入 Macrobenchmark 模块；先用 JankStats/FrameMetrics 与现有测试取证，真机再决定是否建基准。
+- 不把所有页面重画成新视觉；只改影响连续性、反馈与层级的节点。
+- 不再次升级 Kotlin/Compose，不替换 Haze/Backdrop。
 
-- BrokenRepair/LocationRecovery 是覆盖层而非 Screen，Viewer 无统一进出转场：`MainActivity.kt:1547`、`PickerScreen.kt:759`。
-- 加载/空/错/结果 `when` 直切：`PickerScreen.kt:374`、`FixTimeScreen.kt:271`、`LocationRecoveryScreen.kt:379`、`AboutScreen.kt:64`。
-- 列表/网格直接更换 Lazy 容器；部分减少动效分支仍保留 SizeTransform 默认弹簧：`MainScreen.kt:444,384,541`。
-- Picker Chip 缺按压/选中动效与 selected 语义，热区偏小；底部面板不可拖：`PickerScreen.kt:981,726`。
-- 缩略图入场、Viewer 缩放、Crossfade、M3 spinner、完成闪光未全量门控：`Components.kt:182`、`OriginalViewer.kt:131,392`、`PickerScreen.kt:972`、`GlassDesign.kt:788`。
-- 设计 token 未完全接线；dense/liquid 不等于语义材质层级；弹簧与曲线缺统一 token：`DesignTokens.kt:11`、`GlassDesign.kt:359`。
-- onResume 未刷新系统 animator scale；部分完成态缺同帧触觉；每个加载缩略图各自运行无限 pulse：`MainActivity.kt:1883,2325`、`Components.kt:212`。
+## 4. 审计结论
 
-### 3.3 高风险
+### 已具备
 
-- 全局预测返回仍看旧页面标志，覆盖层可能误弹底层设置：`MainActivity.kt:1115,1548`。
-- HazeGlassCard 可在任意尺寸进入 Lens/drawBackdrop；约 44dp Snackbar 也走该路径，缺最小尺寸硬约束：`GlassDesign.kt:382,393,524`、`Components.kt:443,449`。
+- 预测返回跟手/取消回弹、页面转场与减少动效分支：`MainActivity.kt:253,1115,1517`。
+- 滑块/预设/Canvas 色散、连续圆角、CJK 字阶、崩溃自动降级：`GlassSlider.kt:117`、`GlassPresetSelector.kt:88`、`LiquidPress.kt:32`、`GlassCrashSafety.kt:12`。
+- 网格转换忙碌/完成/失败反馈已成体系：`MainScreen.kt:1099`。
 
-## 4. 设计原则
+### 必须修
 
-依据 Apple HIG Motion / Materials：
+- Viewer/AlbumSheet/覆盖层未纳入统一返回优先级，可能误触底层：`MainActivity.kt:1115,1547`、`PickerScreen.kt:726,759`。
+- Loading/Empty/Error/Success 多处 `when` 直切：`PickerScreen.kt:374`、`FixTimeScreen.kt:271`、`LocationRecoveryScreen.kt:379`、`AboutScreen.kt:64`。
+- Picker Chip 缺选中/按压合同与 selected 语义：`PickerScreen.kt:981`。
+- 部分减少动效分支仍允许 SizeTransform 弹簧/缩略图动画：`MainScreen.kt:384,541`、`Components.kt:182`、`OriginalViewer.kt:131,392`。
+- onResume 未刷新系统 animator scale：`MainActivity.kt:1883`。
+- HazeGlassCard 缺 Backdrop 最小尺寸约束：`GlassDesign.kt:382,524`。
 
-1. 动效必须有目的、简短、精确，不能遮挡内容或让用户等待。
-2. 直接操作的反馈要跟手；取消必须可回弹；转场要保留空间关系。
-3. Liquid Glass 是功能层材料，不是内容层装饰；只用于重要交互与导航。
-4. regular 材质优先保证可读；clear 只用于照片/视频等丰富背景，并配合 dimming。
-5. 动效必须可关闭；重要反馈同时提供颜色、文字、图标、触觉等非动画通道。
-6. 同一语义只保留一个主动画来源，避免重复 spring、无限 shimmer 与状态滞后。
+## 5. 设计方案
 
-参考：
-- https://developer.apple.com/design/human-interface-guidelines/motion
-- https://developer.apple.com/design/human-interface-guidelines/materials
+### 5.1 MotionTokens：只统一，不抽象框架
 
-## 5. 架构
+新增 `ui/motion/MotionTokens.kt`，仅存放常量：
 
-### 5.1 MotionTokens
+- `Snappy`：按压、徽标、Chip。
+- `Standard`：状态切换、Sheet 回弹。
+- `Gentle`：共享元素、预测返回。
+- `Fast/Base/Slow/Completion`：120/180/240/340–450ms。
+- `StateSizeTransform(reduceMotion)`：所有 AnimatedContent 显式使用；减少动效直接 snap。
 
-新增 `ui/motion/MotionTokens.kt`：
-
-- `Spring.Snappy`：按压、小控件、徽标进入。
-- `Spring.Standard`：页面内容、状态切换、Sheet 回弹。
-- `Spring.Gentle`：大卡片、共享元素、预测返回。
-- `Duration.Fast / Base / Slow / CompletionBeat`：120 / 180 / 240 / 340–450ms。
-- 统一 `EaseOutStrong` 与线性 progress easing 的适用边界。
-- 所有 `AnimatedContent` 必须显式声明 `SizeTransform`；减少动效时使用 `snap()`，不允许默认弹簧漏网。
+不新增通用动画管理器；现有 composable 直接引用 token。
 
 ### 5.2 MotionPolicy
 
-- `LocalReduceMotion` 保持唯一动画判据。
-- `MainActivity.onResume` 调用 `MotionPrefs.refreshSystem()`。
-- 新增 `LocalMotionBudget`（Normal / Reduced / Paused）：
-  - Normal：完整动效。
-  - Reduced：短淡入/颜色反馈，无无限循环、无闪白、无尺寸弹簧。
-  - Paused：静态材质与进度语义，停止 shimmer/spinner。
-- 离屏 composable 不启动无限动画；可见性变化即取消/恢复。
+- `LocalReduceMotion` 仍是唯一判据。
+- `MainActivity.onResume` 刷新 `MotionPrefs.refreshSystem()`。
+- 新增 `LocalMotionPaused`（滚动/不可见时暂停非关键无限动画）。
+- Loading shimmer 只在可见容器运行；spinner 不可见即不创建。
 
-### 5.3 导航模型
+### 5.3 导航连续性：扩展现有模型
 
-新增统一 `AppRoute` / `OverlayRoute` 描述：
-
-- Screen：Permission / Main / Picker / FixTime / Settings / About / BrokenRepair / LocationRecovery。
-- Overlay：OriginalViewer / AlbumSheet / Dialog / Trash / StatusDetail。
-- NavigationHost 统一处理前进、返回、覆盖层优先级与预测返回。
-- Viewer 使用共享元素转场：Picker cell bounds → 全屏图片 bounds；取消返回跟手。
-- AlbumSheet 使用 draggable bottom sheet，支持拖拽关闭、速率吸附与减少动效直切。
-- 覆盖层忙碌时禁止底层返回，避免误弹设置。
+- 保留现有 Screen enum，新增“当前最上层 Overlay”状态，统一预测返回优先级。
+- Viewer：Picker cell → 全屏图片使用 bounds 插值，取消返回跟手。
+- AlbumSheet：draggable bottom sheet，拖拽关闭、速率吸附、减少动效直切。
+- 修复页/找回位置忙碌时禁止底层返回。
+- 不引入新的 Navigation 库或路由框架。
 
 ### 5.4 控件合同
 
-所有可点组件遵循同一合同：
-
-- `PressFeedback`：按下即响应，松开可取消；弹簧参数来自 MotionTokens。
-- 触控区域 ≥48dp；视觉尺寸与热区分离。
-- `Role.Button / Checkbox / Switch / Tab` 与 selected/toggleable 语义完整。
-- Haptic：选择 CONFIRM、危险操作 REJECT、数值步进 CLOCK_TICK；同一动作只触发一次。
-- `GlassButton` / `GlassIconButton` / `GlassChip` / `GlassSlider` / `GlassDialog` / `GlassSheet` / `Snackbar` 使用统一进出与按压反馈。
-- 预设 Chip 增加选中液滴/形态过渡；不再只做底色交叉。
+- 所有可点元素：按下即响应、松开可取消、≥48dp、语义完整。
+- Picker Chip：按压 spring + selected morph + selected 语义。
+- Dialog/Snackbar/按钮：统一进出与 haptic，不与涟漪叠加重复反馈。
+- Slider/Preset 保持现有 Haze+Canvas 路径，不新增渲染层。
 
 ### 5.5 状态编排
 
-新增统一状态容器：
+只提供三个轻量 helper：
 
-- Loading：共享相位 skeleton shimmer；不在每个卡片各自创建 infinite transition。
-- Empty：柔和玻璃插画 + 单一主动作，fade/scale 进入。
-- Error：语义色图标 + 可重试动作，brief shake/haptic；不整页跳变。
-- Success：短闪白/徽标弹入/状态文案过渡；340ms 内收敛。
-- 所有状态切换使用 Crossfade + 显式 SizeTransform；减少动效直接切换但保留文字/图标/触觉。
+- `StateCrossfade`：显式 fade/SizeTransform，减少动效 snap。
+- `GlassLoadingSkeleton`：共享相位 skeleton。
+- `GlassEmptyErrorState`：图标 + 文案 + 单一主动作。
 
-### 5.6 玻璃材质层级
+应用到关键页面：Picker、FixTime、LocationRecovery、About。Main/Settings 已有状态动效，只补缺口，不重做。
 
-新增语义材质 token：
+### 5.6 玻璃层级
 
-- `GlassThin`：图标、Chip、Slider thumb、Snackbar；Haze+Canvas，禁止 Backdrop。
-- `GlassRegular`：内容卡片、设置分组、Picker/Dock；Haze 优先，Backdrop 仅大尺寸。
-- `GlassThick`：Dialog、全屏 Sheet、高文本密度浮层；更高不透明度与 dimming，保证可读。
-- Backdrop 最小短边阈值：小于 96dp 直接走 Haze/膜；调用处增加 `requireGlassBackdropSize()` 断言与测试。
-- 小尺寸节点继续使用 `LiquidPress` Canvas 色散，不新增 RuntimeShader。
+- `GlassLevel.Thin / Regular / Thick` 只映射现有材质参数，不新建渲染引擎。
+- Thin：小控件、Chip、Slider thumb、Snackbar；禁止 Backdrop。
+- Regular：内容卡片、Picker/Dock。
+- Thick：Dialog、全屏 Sheet、高文本密度浮层。
+- Backdrop 最小短边 96dp；不足直接 Haze/膜，并有自动化测试。
 
-### 5.7 性能预算
+### 5.7 性能与无障碍
 
-- 共享 shimmer phase：一个可见容器最多一个无限相位。
-- 每个页面同时运行的无限动画数量有上限；spinner/shimmer 离屏即停止。
-- 关键路径加入 JankStats/FrameMetrics 采样；Macrobenchmark 覆盖启动、列表滚动、Picker 进入、Viewer 开关、网格转换。
-- 真机门禁：关键交互 P95 帧时间 ≤ 33.4ms，Jank 比例 ≤ 5%，PSS 相对 test8 不增加超过 5%。
-- 模拟器只用于功能/视觉，不作为真机性能结论。
+- 每个可见容器最多一个无限 shimmer；缩略图 pulse 在 reduce motion 下静态。
+- Viewer/Sheet 关闭后立即停止动画与触摸。
+- 完成/失败 haptic 同帧且只触发一次。
+- 2× 字号、深色、浅色、照片氛围、兼容模式、减少动效全部进入截图矩阵。
+- JankStats 只采集关键页面，不做全量常驻监控。
 
-## 6. 数据流
+## 6. 工作包与顺序
 
-- RouteState → NavigationHost → 页面转场/预测返回。
-- InteractionSource → PressFeedback → MotionTokens → 视觉/触觉反馈。
-- ConvertCenter / Scanner / Repository 状态 → UI State Model → Loading/Empty/Error/Success 编排。
-- MaterialLevel + BackgroundLuminance + ReduceMotion + GlassQuality → Glass token → Haze/Backdrop/Canvas 选择。
-- 任一渲染层不可用 → 自动回退下一层，不改变业务数据与语义。
+### WP0 不变量与安全门禁（先做）
 
-## 7. 错误处理与安全
+- MotionTokens、MotionPolicy、系统 animator scale 刷新。
+- Backdrop 最小尺寸 guard 与测试。
+- 减少动效审计：SizeTransform、缩略图、Viewer、spinner、闪白。
 
-- Backdrop 尺寸不足、硬件不可用、模拟器/Robolectric：直接回退 Haze 或膜。
-- RuntimeShader/AGSL 失败：不重试危险路径；保留 Canvas 色散与静态材质。
-- 原生崩溃：`GlassCrashSafety` 自动开启兼容模式；用户可手动恢复。
-- 动画取消/中断：不保留半透明浮层、不锁死进度、不重复触发 haptic。
-- 数据删除、移动、恢复逻辑完全不变。
+验收：现有行为零回归，安全约束可自动测试。
 
-## 8. 无障碍
+### WP1 导航连续性（用户感知最大）
 
-- 系统“移除动画”与应用内减少动效均即时生效。
-- 所有状态不仅靠动画表达；颜色之外有图标、文字、语义与触觉。
-- 高对比/减少透明度偏好下增加不透明 scrim。
-- TalkBack：48dp 热区、selected/toggle、ProgressBarRangeInfo、状态描述完整。
-- 大字号 2× 与长文案不溢出；Chip/Sheet/Dialog 使用 maxLines/ellipsis/自适应高度。
-
-## 9. 测试计划
-
-- 单元：MotionTokens 数值合同、MaterialLevel 选择、Backdrop 最小尺寸、ReduceMotion policy。
-- Compose UI：按压/释放/取消、SetProgress、selected/toggle、Sheet 拖拽、预测返回、状态切换。
-- 截图矩阵：浅/深、标准/流畅、2× 字号、减少动效、兼容模式、照片氛围。
-- Macrobenchmark：启动、主列表滚动、Picker、Viewer、网格转换。
-- 模拟器 host GPU：真路径视觉与交互；无窗口软件 GPU 不用于性能结论。
-- 真机：用户设备完成最终视觉、触感、帧率、PSS 与崩溃验收。
-
-## 10. 分阶段实施
-
-### P0 设计冻结
-
-- 完成 MotionTokens、MotionPolicy、GlassLevel 合同与 spec。
-- 输出关键帧截图矩阵。
-- 用户确认后进入实现。
-
-### P1 导航连续性
-
-- 统一 AppRoute/OverlayRoute 与预测返回优先级。
+- 覆盖层返回优先级。
 - Viewer 共享元素转场。
-- AlbumSheet 拖拽/速率吸附。
-- 修复覆盖层返回栈污染。
+- AlbumSheet 拖拽与预测返回。
 
-### P2 控件与状态
+验收：Picker→Viewer→返回、Sheet 拖拽/取消、修复页返回不误触底层。
 
-- 统一按钮/Chip/Slider/Dialog/Snackbar 合同。
-- Loading skeleton、Empty/Error/Success 编排。
-- Haptic 与 selected/toggle 语义扫尾。
-- 减少动效全量门控。
+### WP2 控件与状态反馈
 
-### P3 材质与性能
+- Picker Chip 合同。
+- Dialog/Snackbar/按钮反馈统一。
+- 关键页面 Loading/Empty/Error/Success helper 接入。
+- Haptic 扫尾。
 
-- thin/regular/thick 材质 token。
-- Backdrop 最小尺寸硬约束。
-- 共享 shimmer phase、离屏停止动画。
-- JankStats/Macrobenchmark 基线。
+验收：所有关键状态不硬切，所有可点元素反馈一致。
 
-### P4 验收发布
+### WP3 材质与视觉收口
 
-- 全量 JVM、lint、签名 Release。
-- 模拟器 host GPU 矩阵。
-- 真机门禁（设备在线时）。
-- 发布 v3.0.0-test9 Pre-release；正式 3.0 仍需用户视觉确认。
+- thin/regular/thick token 接线。
+- 字阶/间距/圆角/状态色统一。
+- 选中态液滴形态、玻璃边缘色散收敛。
+- 共享 shimmer 与离屏停止。
 
-## 11. 验收标准
+验收：浅/深、2× 字号、减少动效、兼容模式截图矩阵通过。
 
-- 小尺寸节点无 Backdrop/AGSL；Backdrop 尺寸约束有自动化测试。
-- 减少动效下无无限循环、无 SizeTransform 弹簧、无闪白、无拖拽惯性。
-- 所有可点元素 ≥48dp，语义与触觉完整。
-- 页面/Viewer/Sheet/Dialog 转场连续，返回不误触底层。
-- Loading/Empty/Error/Success 不硬切，状态不滞后。
-- 全量 JVM、lint、签名构建通过；关键路径性能不回归。
-- 用户过目关键页面与动效后，才可发布正式版。
+### WP4 验证与发布
 
-## 12. 风险与缓解
+- 全量 JVM、Compose UI、截图、lint、签名 Release。
+- host GPU 模拟器关键路径。
+- Jank/PSS 基线记录；真机门禁留给用户设备。
+- 发布 v3.0.0-test9 Pre-release。
 
-- 动效过多导致分心：每页只保留一个主动画层级，其他用短反馈。
-- GPU 成本上升：共享相位、离屏停止、Performance 档、Backdrop 尺寸门禁。
-- 原生崩溃：小节点禁 Backdrop、兼容模式、自动降级。
-- 大改导航导致回归：分阶段提交、预测返回 UI 测试、真机路径复核。
-- 模拟器性能误判：真机门禁为准，模拟器仅功能/视觉。
+## 7. 测试计划
 
-## 13. 效果预览
+- 单元：MotionTokens 数值、GlassLevel 选择、Backdrop 尺寸 guard、ReduceMotion policy。
+- Compose UI：按压/释放/取消、selected/toggle、Sheet 拖拽、预测返回、状态切换。
+- 截图：浅/深、标准/流畅、2× 字号、减少动效、兼容模式、照片氛围。
+- 模拟器 host GPU：Viewer/Sheet/Picker/设置/网格转换关键路径。
+- 真机：帧率、PSS、触感、崩溃最终验收；不在真机缺席时宣称性能结论。
 
-- 主流程故事板：`docs/design-previews/a-route-main-flow.png`
-- 材质与按压细节：`docs/design-previews/a-route-materials.png`
-- 导航与状态连续性：`docs/design-previews/a-route-navigation-states.png`
+## 8. 验收标准
+
+- 小节点无 Backdrop；尺寸 guard 有测试。
+- 减少动效下无无限循环、无 SizeTransform 弹簧、无闪白。
+- 可点元素 ≥48dp，语义与触觉完整。
+- Viewer/Sheet/覆盖层返回连续，不误触底层。
+- 关键状态不硬切、不滞后。
+- 全量 JVM、lint、签名构建通过；关键路径无新增原生崩溃。
+- 用户过目关键动效后才发布正式版。
+
+## 9. 风险与缓解
+
+- 动效过多：同一时刻只保留一个主动画层级。
+- GPU 成本：小节点禁 Backdrop、共享 shimmer、离屏停止、Performance 档。
+- 导航回归：先修返回优先级，再做共享元素；每步单独验证。
+- 范围膨胀：严格按 WP0→WP4，非目标项不做。
+- 模拟器误判：性能结论以真机为准。
+
+## 10. 效果预览
+
+- `docs/design-previews/a-route-main-flow.png`
+- `docs/design-previews/a-route-materials.png`
+- `docs/design-previews/a-route-navigation-states.png`
