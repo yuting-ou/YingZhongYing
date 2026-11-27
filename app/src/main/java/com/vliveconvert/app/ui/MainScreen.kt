@@ -332,45 +332,46 @@ fun MainScreen(
             }
         }
 
-        // ── 列表头 ──
+        // ── 列表头：计数与清空一行，视图模式使用独立分段控件 ──
         if (items.isNotEmpty()) {
-            Row(
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    // end 6dp：「清空」在 48dp 触摸区内居中，自身留白约 10dp，6+10=16dp
-                    // 落到全页右基线（与左缘 16dp 对称）
-                    .padding(start = 16.dp, end = 12.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 16.dp, end = 12.dp, bottom = 6.dp)
             ) {
-                Text(
-                    if (isConverting) "转换中 · 共 ${items.size} 张"
-                    else "已选 ${items.size} 张",
-                    style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface)
-                )
-                Spacer(Modifier.weight(1f))
-                if (!isConverting && failedCount > 0) {
-                    InlineTextButton(
-                        text = "重试失败 $failedCount",
-                        contentColor = MaterialTheme.colorScheme.tertiary,
-                        onClick = onRetryFailed,
-                        style = TextStyle(fontSize = 14.sp)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (isConverting) "转换中 · 共 ${items.size} 张"
+                        else "已选 ${items.size} 张",
+                        style = TextStyle(fontSize = DesignTokens.Metric,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface)
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.weight(1f))
+                    if (!isConverting && failedCount > 0) {
+                        InlineTextButton(
+                            text = "重试失败 $failedCount",
+                            contentColor = MaterialTheme.colorScheme.tertiary,
+                            onClick = onRetryFailed,
+                            style = TextStyle(fontSize = 14.sp)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    if (!isConverting) {
+                        InlineTextButton(
+                            text = "清空",
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            onClick = onClearAll,
+                            style = TextStyle(fontSize = 14.sp)
+                        )
+                    }
                 }
                 if (!isConverting) {
-                    InlineTextButton(
-                        text = if (viewMode == "grid") "列表" else "网格",
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        onClick = { setViewMode(if (viewMode == "grid") "list" else "grid") },
-                        style = TextStyle(fontSize = 14.sp)
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    InlineTextButton(
-                        text = "清空",
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        onClick = onClearAll,
-                        style = TextStyle(fontSize = 14.sp)
+                    Spacer(Modifier.height(4.dp))
+                    AppleSegmentedControl(
+                        options = listOf("列表", "网格"),
+                        selectedIndex = if (viewMode == "grid") 1 else 0,
+                        onSelect = { index -> setViewMode(if (index == 1) "grid" else "list") }
                     )
                 }
             }

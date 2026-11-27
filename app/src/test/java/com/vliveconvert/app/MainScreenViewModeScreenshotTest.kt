@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.ui.ConvertItem
@@ -85,6 +86,7 @@ class MainScreenViewModeScreenshotTest {
             }
         }
         compose.waitForIdle()
+        compose.onNodeWithTag("apple_segmented_control").assertExists()
     }
 
     private fun prefs() = ApplicationProvider.getApplicationContext<VliveApp>()
