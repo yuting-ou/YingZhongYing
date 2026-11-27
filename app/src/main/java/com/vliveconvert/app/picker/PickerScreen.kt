@@ -67,9 +67,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -141,6 +138,9 @@ import com.vliveconvert.app.ui.HazeGlassCard
 import com.vliveconvert.app.ui.EaseOutStrong
 import com.vliveconvert.app.ui.GlassIconTile
 import com.vliveconvert.app.ui.GlassIndeterminateBar
+import com.vliveconvert.app.ui.GlassEmptyErrorState
+import com.vliveconvert.app.ui.GlassLoadingSkeleton
+import com.vliveconvert.app.ui.StateCrossfade
 import com.vliveconvert.app.ui.glassBackdropSource
 import com.vliveconvert.app.ui.glassSurface
 import com.vliveconvert.app.ui.glassWallpaper
@@ -391,131 +391,94 @@ fun PickerScreen(
                     .statusBarsPadding()
                     .navigationBarsPadding()
             ) {
-                when {
-                    results == null -> Column(
-                        Modifier.fillMaxSize().padding(top = headerHeight),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                val contentState = when {
+                    results == null -> PickerContentState.NoAlbum
+                    state?.error != null && !running && !globalMode -> PickerContentState.Error
+                    showsAlbumEmptyState(results.isEmpty(), running, globalMode) ->
+                        PickerContentState.EmptyAlbum
+                    busy && visible.isEmpty() -> PickerContentState.Loading
+                    visible.isEmpty() -> PickerContentState.EmptySearch
+                    else -> PickerContentState.Content
+                }
+                StateCrossfade(
+                    targetState = contentState,
+                    modifier = Modifier.fillMaxSize(),
+                    label = "pickerContent"
+                ) { current ->
+                    when (current) {
+                        PickerContentState.NoAlbum -> GlassEmptyErrorState(
+                            title = "没有可用相册",
+                            description = "返回后重新进入选择器重试；若反复出现，请检查存储权限是否完整",
+                            modifier = Modifier.fillMaxSize().padding(top = headerHeight)
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Text("没有可用相册", style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(4.dp))
-                        Text("返回后重新进入选择器重试；若反复出现，请检查存储权限是否完整",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    state?.error != null && !running && !globalMode -> Column(
-                        Modifier.fillMaxSize()
-                            .padding(top = headerHeight + 14.dp, bottom = 48.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Filled.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.error
+                        PickerContentState.Error -> GlassEmptyErrorState(
+                            title = "扫描相册失败",
+                            description = state?.error.orEmpty(),
+                            modifier = Modifier.fillMaxSize()
+                                .padding(top = headerHeight + 14.dp, bottom = 48.dp),
+                            error = true,
+                            actionLabel = "重新扫描",
+                            onAction = { bucketId?.let { scanner.retry(it, scannerScope) } }
                         )
-                        Spacer(Modifier.height(12.dp))
-                        Text("扫描相册失败", style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(4.dp))
-                        Text(state?.error ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            "重新扫描",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clip(continuousShape(8.dp))
-                                .clickable {
-                                    bucketId?.let { scanner.retry(it, scannerScope) }
+                        PickerContentState.Loading -> Column(
+                            Modifier.fillMaxSize()
+                                .padding(top = headerHeight + 14.dp, bottom = 48.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            GlassLoadingSkeleton(
+                                Modifier.fillMaxWidth().padding(horizontal = 32.dp)
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Text(
+                                if (globalMode) "正在搜索全部相册…" else "正在读取相册…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        PickerContentState.EmptyAlbum -> GlassEmptyErrorState(
+                            title = "没有找到双文件实况照片",
+                            description = "拍摄时请保持相机的「实况」开关开启",
+                            modifier = Modifier.fillMaxSize()
+                                .padding(top = headerHeight + 14.dp, bottom = 48.dp)
+                        )
+                        PickerContentState.EmptySearch -> GlassEmptyErrorState(
+                            title = if (globalSearchError) "全库搜索失败" else "没有匹配的照片",
+                            description = if (globalSearchError) "请重试或换个文件名关键词"
+                            else "换个文件名关键词试试",
+                            modifier = Modifier.fillMaxSize()
+                                .padding(top = headerHeight + 14.dp, bottom = 48.dp),
+                            error = globalSearchError
+                        )
+                        PickerContentState.Content -> AlbumGridPage(
+                            sections = sections,
+                            gridState = gridState,
+                            selectedIds = selectedIds,
+                            selectedIndex = selectedIndex,
+                            onToggle = toggleItem,
+                            onToggleGroup = toggleGroup,
+                            onPreview = { item ->
+                                val idx = visible.indexOf(item)
+                                if (idx >= 0) {
+                                    // 搜索后进预览时键盘不收会盖住底部玻璃选图栏
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    lastPreviewIndex = idx
+                                    previewIndex = idx
                                 }
-                                .padding(horizontal = 24.dp, vertical = 12.dp)
+                            },
+                            running = running && !globalMode && total > 0,
+                            // 「已转」角标此前从未接上（默认恒 false，只有筛选生效）：一并接上
+                            isConverted = convertedChecker,
+                            isAdded = { it.id in addedIds },
+                            previewKey = previewIndex?.let { visible.getOrNull(it)?.key },
+                            contentPadding = PaddingValues(
+                                start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin,
+                                // 多留 20dp 呼吸区：12dp 时首行贴着悬浮面板的阴影带，
+                                // 流式扫描时新结果一帧帧顶上来，像被「选择照片」面板压住
+                                top = headerHeight + 20.dp, bottom = 120.dp)
                         )
                     }
-                    showsAlbumEmptyState(results.isEmpty(), running, globalMode) -> Column(
-                        Modifier.fillMaxSize()
-                            .padding(top = headerHeight + 14.dp, bottom = 48.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text("没有找到双文件实况照片", style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.height(4.dp))
-                        Text("拍摄时请保持相机的「实况」开关开启",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    visible.isEmpty() && !busy -> Column(
-                        Modifier.fillMaxSize()
-                            .padding(top = headerHeight + 14.dp, bottom = 48.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Filled.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            if (globalSearchError) "全库搜索失败" else "没有匹配的照片",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            if (globalSearchError) "请重试或换个文件名关键词" else "换个文件名关键词试试",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    else -> AlbumGridPage(
-                        sections = sections,
-                        gridState = gridState,
-                        selectedIds = selectedIds,
-                        selectedIndex = selectedIndex,
-                        onToggle = toggleItem,
-                        onToggleGroup = toggleGroup,
-                        onPreview = { item ->
-                            val idx = visible.indexOf(item)
-                            if (idx >= 0) {
-                                // 搜索后进预览时键盘不收会盖住底部玻璃选图栏
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                                lastPreviewIndex = idx
-                                previewIndex = idx
-                            }
-                        },
-                        running = running && !globalMode && total > 0,
-                        // 「已转」角标此前从未接上（默认恒 false，只有筛选生效）：一并接上
-                        isConverted = convertedChecker,
-                        isAdded = { it.id in addedIds },
-                        previewKey = previewIndex?.let { visible.getOrNull(it)?.key },
-                        contentPadding = PaddingValues(
-                            start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin,
-                            // 多留 20dp 呼吸区：12dp 时首行贴着悬浮面板的阴影带，
-                            // 流式扫描时新结果一帧帧顶上来，像被「选择照片」面板压住
-                            top = headerHeight + 20.dp, bottom = 120.dp)
-                    )
                 }
             }
         }
@@ -972,6 +935,8 @@ private fun AlbumSheetRow(
  * 非粘性标题既能清楚分隔每天，又不会永久遮照片。
  */
 private data class PickerSection(val key: String, val items: List<MediaItem>)
+
+private enum class PickerContentState { NoAlbum, Error, Loading, EmptyAlbum, EmptySearch, Content }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable

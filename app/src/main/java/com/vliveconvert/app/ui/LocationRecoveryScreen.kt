@@ -90,6 +90,8 @@ import androidx.compose.ui.unit.lerp
  * 右下角状态角标（「需修复」琥珀 / 「无位置」中性，同「已添加/已转」槽位）、
  * 底部液态玻璃 Dock。规格引用 [DesignTokens]，不再各自硬编码。
  */
+private enum class LocationContentState { Loading, Error, Empty, Content }
+
 @Composable
 fun LocationRecoveryScreen(
     /** 「位置」权限：文件坐标与行坐标的读取都被它管辖，扫描前必须拿到 */
@@ -376,13 +378,25 @@ fun LocationRecoveryScreen(
                     .padding(horizontal = DesignTokens.ScreenHMargin, vertical = 8.dp)
                     .weight(1f)
             ) {
-                when {
-                    scanning -> Box(
+                val contentState = when {
+                    scanning -> LocationContentState.Loading
+                    scanError != null -> LocationContentState.Error
+                    repairNeeded.isEmpty() && noLocation.isEmpty() && unknown.isEmpty() &&
+                        unreadable.isEmpty() -> LocationContentState.Empty
+                    else -> LocationContentState.Content
+                }
+                StateCrossfade(
+                    targetState = contentState,
+                    modifier = Modifier.fillMaxSize(),
+                    label = "locationContent"
+                ) { current ->
+                    when (current) {
+                    LocationContentState.Loading -> Box(
                         Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            GlassIndeterminateBar(Modifier.width(120.dp).height(3.dp))
-                            Spacer(Modifier.height(10.dp))
+                            GlassLoadingSkeleton(Modifier.width(180.dp))
+                            Spacer(Modifier.height(14.dp))
                             Text(
                                 "正在逐张体检（文件坐标 + 媒体库行坐标），已发现 ${scanProgress.third} 张",
                                 style = TextStyle(fontSize = 12.sp),
@@ -390,52 +404,28 @@ fun LocationRecoveryScreen(
                             )
                         }
                     }
-                    scanError != null -> Box(
-                        Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                "体检扫描失败：$scanError",
-                                style = TextStyle(fontSize = 13.sp, lineHeight = 20.sp),
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            InlineTextButton(
-                                text = "重试",
-                                contentColor = MaterialTheme.colorScheme.primary,
-                                style = TextStyle(fontSize = DesignTokens.ToolRowText),
-                                onClick = { startScan() }
-                            )
-                        }
-                    }
-                    repairNeeded.isEmpty() && noLocation.isEmpty() && unknown.isEmpty() &&
-                        unreadable.isEmpty() -> Box(
-                        Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                if (okRows.isEmpty()) "没有发现本工具产物"
-                                else "全部 ${okRows.size} 张产物的位置都正常\n\n" +
-                                    "「需修复」= 相册里不显示位置的照片；判定基于文件坐标" +
-                                    (if (outcome?.calibration?.isUsable == true) "与媒体库行坐标"
-                                    else "（本机媒体库坐标列读不出，行坐标未能核对）"),
-                                style = TextStyle(fontSize = 13.sp, lineHeight = 20.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                            if (okRows.isNotEmpty()) {
-                                Spacer(Modifier.height(10.dp))
-                                InlineTextButton(
-                                    text = if (showOk) "收起已正常列表" else "查看已正常列表",
-                                    contentColor = MaterialTheme.colorScheme.primary,
-                                    style = TextStyle(fontSize = DesignTokens.ToolRowText),
-                                    onClick = { showOk = !showOk }
-                                )
-                            }
-                        }
-                    }
-                    else -> LazyVerticalGrid(
+                    LocationContentState.Error -> GlassEmptyErrorState(
+                        title = "体检扫描失败",
+                        description = scanError.orEmpty(),
+                        modifier = Modifier.fillMaxSize(),
+                        error = true,
+                        actionLabel = "重试",
+                        onAction = { startScan() }
+                    )
+                    LocationContentState.Empty -> GlassEmptyErrorState(
+                        title = if (okRows.isEmpty()) "没有发现本工具产物"
+                        else "全部 ${okRows.size} 张产物的位置都正常",
+                        description = if (okRows.isEmpty()) "" else
+                            "「需修复」= 相册里不显示位置的照片；判定基于文件坐标" +
+                                (if (outcome?.calibration?.isUsable == true) "与媒体库行坐标"
+                                else "（本机媒体库坐标列读不出，行坐标未能核对）"),
+                        modifier = Modifier.fillMaxSize(),
+                        actionLabel = if (okRows.isNotEmpty()) {
+                            if (showOk) "收起已正常列表" else "查看已正常列表"
+                        } else null,
+                        onAction = if (okRows.isNotEmpty()) {{ showOk = !showOk }} else null
+                    )
+                    LocationContentState.Content -> LazyVerticalGrid(
                         state = gridState,
                         columns = GridCells.Fixed(DesignTokens.GridColumns),
                         modifier = Modifier.fillMaxSize(),
@@ -574,6 +564,7 @@ fun LocationRecoveryScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }

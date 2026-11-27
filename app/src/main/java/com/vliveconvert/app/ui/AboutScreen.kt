@@ -225,12 +225,23 @@ fun AboutScreen(
                 radius = 24.dp,
                 contentPadding = PaddingValues(16.dp)
             ) {
-                Text(
-                    licenseText ?: "正在读取许可证文本…",
-                    style = TextStyle(fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace, lineHeight = 17.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                StateCrossfade(
+                    targetState = licenseText != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = "gplLicense",
+                    animateSize = false
+                ) { loaded ->
+                    if (loaded) {
+                        Text(
+                            licenseText.orEmpty(),
+                            style = TextStyle(fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace, lineHeight = 17.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        GlassLoadingSkeleton(Modifier.fillMaxWidth())
+                    }
+                }
             }
             Spacer(Modifier.height(24.dp))
             Text(
@@ -244,12 +255,23 @@ fun AboutScreen(
                 radius = 24.dp,
                 contentPadding = PaddingValues(16.dp)
             ) {
-                Text(
-                    apacheText ?: "正在读取许可证文本…",
-                    style = TextStyle(fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace, lineHeight = 17.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                StateCrossfade(
+                    targetState = apacheText != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = "apacheLicense",
+                    animateSize = false
+                ) { loaded ->
+                    if (loaded) {
+                        Text(
+                            apacheText.orEmpty(),
+                            style = TextStyle(fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace, lineHeight = 17.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        GlassLoadingSkeleton(Modifier.fillMaxWidth())
+                    }
+                }
             }
             Spacer(Modifier.height(24.dp))
         }

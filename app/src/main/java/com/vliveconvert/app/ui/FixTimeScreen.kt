@@ -87,6 +87,8 @@ import java.util.Locale
  * 扫描全部相册中的单文件实况（XMP 含 MotionPhoto/MicroVideo），多选后
  * 按文件名中的拍摄时间批量修正「修改时间」。
  */
+private enum class FixTimeContentState { NoAlbum, Loading, Empty, Content }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FixTimeScreen(
@@ -268,23 +270,42 @@ fun FixTimeScreen(
 
         // ── 网格 ──
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().navigationBarsPadding()) {
-            when {
-                results == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("没有可用相册", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                results.isEmpty() && !scanning -> Column(
-                    Modifier.fillMaxSize().padding(bottom = 48.dp),
+            val contentState = when {
+                results == null -> FixTimeContentState.NoAlbum
+                results.isEmpty() && scanning -> FixTimeContentState.Loading
+                results.isEmpty() -> FixTimeContentState.Empty
+                else -> FixTimeContentState.Content
+            }
+            StateCrossfade(
+                targetState = contentState,
+                modifier = Modifier.fillMaxSize(),
+                label = "fixTimeContent"
+            ) { current ->
+                when (current) {
+                FixTimeContentState.NoAlbum -> GlassEmptyErrorState(
+                    title = "没有可用相册",
+                    description = "返回后重新进入选择器重试",
+                    modifier = Modifier.fillMaxSize()
+                )
+                FixTimeContentState.Loading -> Column(
+                    Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("没有待修复的单文件实况", style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(4.dp))
-                    Text("仅显示修改时间与照片时间不一致的单文件实况；已一致的不会出现",
+                    GlassLoadingSkeleton(Modifier.fillMaxWidth().padding(horizontal = 32.dp))
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        "正在扫描单文件实况…",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-                else -> LazyVerticalGrid(
+                FixTimeContentState.Empty -> GlassEmptyErrorState(
+                    title = "没有待修复的单文件实况",
+                    description = "仅显示修改时间与照片时间不一致的单文件实况；已一致的不会出现",
+                    modifier = Modifier.fillMaxSize().padding(bottom = 48.dp)
+                )
+                FixTimeContentState.Content -> LazyVerticalGrid(
                     state = gridState,
                     // 2 列（而非 3 列）：每格要放「文件名 + 现 + 目标」三行小字，
                     // 3 列时格宽仅约 136dp、文字被迫压到 9sp，偏小；2 列下约 204dp、可读性明显更好
@@ -352,6 +373,7 @@ fun FixTimeScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
