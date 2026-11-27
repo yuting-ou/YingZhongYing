@@ -9,11 +9,15 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.LruCache
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -102,10 +106,13 @@ import kotlin.math.roundToInt
  * 全屏原图查看：点网格左上角放大镜进入。
  * 原图与网格缩略图分开加载（这里才解码 JPG 本身），左右翻当前可见列表。
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-internal fun OriginalViewer(
+internal fun SharedTransitionScope.OriginalViewer(
     items: List<MediaItem>,
     initialIndex: Int,
+    sharedState: SharedTransitionScope.SharedContentState,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     selectedIds: Set<Long>,
     onToggleSelected: (MediaItem) -> Unit,
     onClose: () -> Unit
@@ -273,9 +280,22 @@ internal fun OriginalViewer(
                     userScrollEnabled = !zoomed,
                     key = { items[it].id }
                 ) { index ->
+                    val sharedModifier = if (index == initialIndex) {
+                        Modifier.sharedElement(
+                            sharedContentState = sharedState,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            boundsTransform = { _, _ ->
+                                if (reduceMotion) snap()
+                                else spring(dampingRatio = 0.82f, stiffness = 420f)
+                            }
+                        )
+                    } else {
+                        Modifier
+                    }
                     OriginalPage(
                         item = items[index],
                         modifier = Modifier.fillMaxSize(),
+                        sharedModifier = sharedModifier,
                         onImageSize = { size ->
                             if (pager.currentPage == index) imageSize = size
                         }
@@ -381,6 +401,7 @@ internal fun OriginalViewer(
 private fun OriginalPage(
     item: MediaItem,
     modifier: Modifier = Modifier,
+    sharedModifier: Modifier = Modifier,
     onImageSize: (IntSize) -> Unit
 ) {
     val context = LocalContext.current
@@ -401,11 +422,12 @@ private fun OriginalPage(
 
     Crossfade(
         targetState = state,
+        modifier = modifier.then(sharedModifier),
         animationSpec = if (reduceMotion) snap() else tween(220),
         label = "originalImage"
     ) { s ->
         when (s) {
-            OriginalLoadState.Loading -> Box(modifier, contentAlignment = Alignment.Center) {
+            OriginalLoadState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 MediaThumbnail(item.uri, context.contentResolver, Modifier.fillMaxSize().alpha(0.32f))
                 if (reduceMotion) {
                     Canvas(Modifier.size(32.dp)) {
@@ -437,7 +459,7 @@ private fun OriginalPage(
                 LaunchedEffect(bitmap) {
                     onImageSize(IntSize(bitmap.width, bitmap.height))
                 }
-                Box(modifier) {
+                Box(Modifier.fillMaxSize()) {
                     // 同图虚化铺满黑边，让玻璃顶/底栏始终有背景可折射
                     androidx.compose.foundation.Image(
                         bitmap = bitmap.asImageBitmap(),
@@ -455,7 +477,7 @@ private fun OriginalPage(
                 }
             }
             is OriginalLoadState.Failed -> Column(
-                modifier.fillMaxSize(),
+                Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

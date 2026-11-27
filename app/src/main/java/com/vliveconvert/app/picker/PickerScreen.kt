@@ -3,6 +3,10 @@ package com.vliveconvert.app.picker
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloat
@@ -179,6 +183,7 @@ internal fun filterByDateRange(items: List<MediaItem>, days: Int, nowMs: Long): 
     return items.filter { it.sortTime >= cutoff }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun PickerScreen(
     albums: List<AlbumInfo>,
@@ -245,6 +250,7 @@ fun PickerScreen(
     // 切换相册即清空（搜索是「在本相册里找」的心智模型）
     var searchQuery by remember(bucketId) { mutableStateOf("") }
     var previewIndex by remember(bucketId) { mutableStateOf<Int?>(null) }
+    var lastPreviewIndex by remember(bucketId) { mutableStateOf<Int?>(null) }
     // 搜索范围：默认当前相册；「全部相册」走全库查询（去抖 400ms，候选逐一校验伴生 mp4）
     var searchScopeAll by remember(bucketId) { mutableStateOf(false) }
     // 日期范围：0=不限、7、30
@@ -367,6 +373,7 @@ fun PickerScreen(
     }
 
     GlassScrollPauseScope(gridState) {
+    SharedTransitionLayout {
     Box(Modifier.fillMaxSize()) {
         // 壁纸 + 网格是 Haze 的采样源；浮动导航不在源里，
         // 否则玻璃会把自己也采进背景，形成反馈
@@ -492,6 +499,7 @@ fun PickerScreen(
                                 // 搜索后进预览时键盘不收会盖住底部玻璃选图栏
                                 focusManager.clearFocus()
                                 keyboardController?.hide()
+                                lastPreviewIndex = idx
                                 previewIndex = idx
                             }
                         },
@@ -499,6 +507,7 @@ fun PickerScreen(
                         // 「已转」角标此前从未接上（默认恒 false，只有筛选生效）：一并接上
                         isConverted = convertedChecker,
                         isAdded = { it.id in addedIds },
+                        previewKey = previewIndex?.let { visible.getOrNull(it)?.key },
                         contentPadding = PaddingValues(
                             start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin,
                             // 多留 20dp 呼吸区：12dp 时首行贴着悬浮面板的阴影带，
@@ -767,15 +776,24 @@ fun PickerScreen(
             )
         }
 
-        previewIndex?.let { index ->
+        AnimatedVisibility(
+            visible = previewIndex != null,
+            enter = fadeIn(if (reduceMotion) snap() else tween(160, easing = EaseOutStrong)),
+            exit = fadeOut(if (reduceMotion) snap() else tween(120))
+        ) {
+            val index = lastPreviewIndex ?: return@AnimatedVisibility
+            val item = visible.getOrNull(index) ?: return@AnimatedVisibility
             OriginalViewer(
                 items = visible,
                 initialIndex = index,
+                sharedState = rememberSharedContentState(item.key),
+                animatedVisibilityScope = this,
                 selectedIds = selectedIds,
                 onToggleSelected = toggleItem,
                 onClose = { previewIndex = null }
             )
         }
+    }
     }
     }
 }
@@ -929,8 +947,9 @@ private fun AlbumSheetRow(
  */
 private data class PickerSection(val key: String, val items: List<MediaItem>)
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun AlbumGridPage(
+private fun SharedTransitionScope.AlbumGridPage(
     sections: List<PickerSection>,
     gridState: LazyGridState,
     selectedIds: Set<Long>,
@@ -940,6 +959,7 @@ private fun AlbumGridPage(
     onPreview: (MediaItem) -> Unit,
     isConverted: (MediaItem) -> Boolean = { false },
     isAdded: (MediaItem) -> Boolean = { false },
+    previewKey: String?,
     running: Boolean,
     contentPadding: PaddingValues = PaddingValues()
 ) {
@@ -980,6 +1000,7 @@ private fun AlbumGridPage(
                 )
             }
             items(section.items, key = { it.key }, contentType = { "photo" }) { item ->
+                val sharedState = rememberSharedContentState(item.key)
                 GridCell(
                     modifier = Modifier.animateItem(
                         fadeInSpec = if (reduceMotion) null else tween(220, easing = EaseOutStrong),
@@ -992,6 +1013,8 @@ private fun AlbumGridPage(
                     selectionIndex = selectedIndex[item.id] ?: -1,
                     converted = isConverted(item),
                     added = isAdded(item),
+                    sharedState = sharedState,
+                    sharedVisible = previewKey != item.key,
                     onToggle = { onToggle(item) },
                     onPreview = { onPreview(item) }
                 )
@@ -1130,13 +1153,16 @@ private fun AlbumChip(
 /**
  * 网格单元：勾选徽章在右上角；选中以几何中心缩放 + 圆角增大过渡。
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun GridCell(
+private fun SharedTransitionScope.GridCell(
     item: MediaItem,
     selected: Boolean,
     selectionIndex: Int,
     converted: Boolean = false,
     added: Boolean = false,
+    sharedState: SharedTransitionScope.SharedContentState?,
+    sharedVisible: Boolean,
     onToggle: () -> Unit,
     onPreview: () -> Unit,
     modifier: Modifier = Modifier
@@ -1202,7 +1228,21 @@ private fun GridCell(
                     shape = continuousShape(cornerRadius)
                 )
         ) {
-            MediaThumbnail(item.uri, resolver, Modifier.fillMaxSize())
+            val imageModifier = if (sharedState != null) {
+                Modifier
+                    .fillMaxSize()
+                    .sharedElementWithCallerManagedVisibility(
+                        sharedContentState = sharedState,
+                        visible = sharedVisible,
+                        boundsTransform = { _, _ ->
+                            if (reduceMotion) snap()
+                            else spring(dampingRatio = 0.82f, stiffness = 420f)
+                        }
+                    )
+            } else {
+                Modifier.fillMaxSize()
+            }
+            MediaThumbnail(item.uri, resolver, imageModifier)
         }
 
         // 实况标记（左下角小圆点），提示这是动态照片

@@ -1,6 +1,7 @@
 package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -11,6 +12,7 @@ import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
 import com.vliveconvert.app.picker.PickerScanner
 import com.vliveconvert.app.picker.PickerScreen
+import com.vliveconvert.app.ui.LocalReduceMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertTrue
@@ -44,7 +46,7 @@ class PickerOriginalViewerTest {
         size = 1024L
     )
 
-    private fun render(items: List<MediaItem>) {
+    private fun render(items: List<MediaItem>, reduceMotion: Boolean = false) {
         val bucket = 7L
         val scanner = PickerScanner(MediaRepo(compose.activity.contentResolver))
         val state = scanner.stateOf(bucket)
@@ -54,13 +56,15 @@ class PickerOriginalViewerTest {
         state.completed = true
 
         compose.setContent {
-            PickerScreen(
-                albums = listOf(AlbumInfo(bucket, "Camera", items.size, items.first().id, 0L)),
-                scanner = scanner,
-                scannerScope = CoroutineScope(Dispatchers.Unconfined),
-                onBack = {},
-                onConfirm = {}
-            )
+            CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
+                PickerScreen(
+                    albums = listOf(AlbumInfo(bucket, "Camera", items.size, items.first().id, 0L)),
+                    scanner = scanner,
+                    scannerScope = CoroutineScope(Dispatchers.Unconfined),
+                    onBack = {},
+                    onConfirm = {}
+                )
+            }
         }
     }
 
@@ -97,5 +101,38 @@ class PickerOriginalViewerTest {
         compose.waitForIdle()
         compose.onNodeWithText("IMG_2.jpg").assertExists()
         compose.onNodeWithText("1 / 2").assertExists()
+    }
+
+    @Test
+    fun sharedTransition_canBeInterruptedByClose() {
+        render(listOf(media(1), media(2)))
+
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").performClick()
+        compose.onNodeWithContentDescription("关闭预览").performClick()
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+
+        assertTrue(
+            "快速关闭后查看器必须彻底退出",
+            compose.onAllNodesWithContentDescription("关闭预览").fetchSemanticsNodes().isEmpty()
+        )
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").assertExists()
+        compose.onNodeWithText("2 张双文件实况").assertExists()
+    }
+
+    @Test
+    fun reducedMotion_opensViewerWithoutWaitingForTransition() {
+        render(listOf(media(1)), reduceMotion = true)
+
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").performClick()
+        compose.mainClock.advanceTimeBy(1)
+        compose.waitForIdle()
+
+        compose.onNodeWithText("IMG_1.jpg").assertExists()
+        compose.onNodeWithText("选择这张").performClick()
+        compose.onNodeWithContentDescription("关闭预览").performClick()
+        compose.mainClock.advanceTimeBy(1)
+        compose.waitForIdle()
+        compose.onNodeWithText("已选 1 张").assertExists()
     }
 }
