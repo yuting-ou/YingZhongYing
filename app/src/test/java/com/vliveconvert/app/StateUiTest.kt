@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.ui.GlassLoadingSkeleton
 import com.vliveconvert.app.ui.LocalReduceMotion
@@ -84,7 +86,11 @@ class StateUiTest {
             }
         }
         compose.mainClock.advanceTimeBy(300)
-        compose.onNodeWithTag("glass_loading_skeleton").assertExists()
+        val skeleton = compose.onNodeWithTag("glass_loading_skeleton").fetchSemanticsNode()
+        org.junit.Assert.assertEquals(
+            ProgressBarRangeInfo.Indeterminate,
+            skeleton.config[SemanticsProperties.ProgressBarRangeInfo]
+        )
 
         compose.runOnIdle { state.value = ScreenState.Empty }
         compose.mainClock.advanceTimeBy(16)

@@ -2,7 +2,6 @@ package com.vliveconvert.app.ui
 
 import android.content.Intent
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -189,7 +188,7 @@ fun LocationRecoveryScreen(
     LaunchedEffect(locationGranted) {
         if (locationGranted && !ConvertCenter.isLocationRepairing) startScan()
     }
-    BackHandler(enabled = !repairing) { onBack() }
+    RepairBackHandler(busy = repairing, onBack = onBack)
 
     // ── 分类分组（判定矩阵输出）──
     val rows = outcome?.rows ?: emptyList()

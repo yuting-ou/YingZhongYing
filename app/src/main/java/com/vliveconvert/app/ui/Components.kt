@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.util.LruCache
 import android.util.Size
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.snap
@@ -344,6 +345,11 @@ fun CircleTriCheckbox(
             }
         }
     }
+}
+
+@Composable
+internal fun RepairBackHandler(busy: Boolean, onBack: () -> Unit) {
+    BackHandler { if (!busy) onBack() }
 }
 
 /**

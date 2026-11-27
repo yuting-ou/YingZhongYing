@@ -139,6 +139,7 @@ fun FixTimeScreen(
         }
     }
     val scanning = scanProgress.second
+    RepairBackHandler(busy = isFixing, onBack = onBack)
 
     val n = results?.size ?: 0
     val displayOrder = remember(results, n) {

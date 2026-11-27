@@ -254,6 +254,10 @@ fun PickerScreen(
     var searchQuery by remember(bucketId) { mutableStateOf("") }
     var previewIndex by remember(bucketId) { mutableStateOf<Int?>(null) }
     var lastPreviewIndex by remember(bucketId) { mutableStateOf<Int?>(null) }
+    var viewerBackAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    BackHandler(enabled = previewIndex != null) {
+        viewerBackAction?.invoke() ?: run { previewIndex = null }
+    }
     // 搜索范围：默认当前相册；「全部相册」走全库查询（去抖 400ms，候选逐一校验伴生 mp4）
     var searchScopeAll by remember(bucketId) { mutableStateOf(false) }
     // 日期范围：0=不限、7、30
@@ -758,6 +762,7 @@ fun PickerScreen(
                 animatedVisibilityScope = this,
                 selectedIds = selectedIds,
                 onToggleSelected = toggleItem,
+                onBackActionChanged = { viewerBackAction = it },
                 onClose = { previewIndex = null }
             )
         }

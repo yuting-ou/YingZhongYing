@@ -1,6 +1,7 @@
 package com.vliveconvert.app
 
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -15,6 +16,7 @@ import com.vliveconvert.app.picker.PickerScreen
 import com.vliveconvert.app.ui.LocalReduceMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -46,7 +48,11 @@ class PickerOriginalViewerTest {
         size = 1024L
     )
 
-    private fun render(items: List<MediaItem>, reduceMotion: Boolean = false) {
+    private fun render(
+        items: List<MediaItem>,
+        reduceMotion: Boolean = false,
+        onParentBack: () -> Unit = {}
+    ) {
         val bucket = 7L
         val scanner = PickerScanner(MediaRepo(compose.activity.contentResolver))
         val state = scanner.stateOf(bucket)
@@ -57,6 +63,7 @@ class PickerOriginalViewerTest {
 
         compose.setContent {
             CompositionLocalProvider(LocalReduceMotion provides reduceMotion) {
+                BackHandler(onBack = onParentBack)
                 PickerScreen(
                     albums = listOf(AlbumInfo(bucket, "Camera", items.size, items.first().id, 0L)),
                     scanner = scanner,
@@ -118,6 +125,27 @@ class PickerOriginalViewerTest {
         )
         compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").assertExists()
         compose.onNodeWithText("2 张双文件实况").assertExists()
+    }
+
+    @Test
+    fun secondBackDuringViewerExit_reachesParentImmediately() {
+        var parentBacks = 0
+        render(listOf(media(1)), onParentBack = { parentBacks++ })
+
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").performClick()
+        compose.waitForIdle()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.mainClock.advanceTimeBy(48)
+        compose.waitForIdle()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.mainClock.advanceTimeBy(600)
+        compose.waitForIdle()
+
+        assertEquals("查看器退场的 120ms 内不得再吞一次返回", 1, parentBacks)
+        assertTrue(
+            "查看器应已关闭",
+            compose.onAllNodesWithContentDescription("关闭预览").fetchSemanticsNodes().isEmpty()
+        )
     }
 
     @Test

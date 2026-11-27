@@ -89,7 +89,7 @@ internal fun GlassLoadingSkeleton(modifier: Modifier = Modifier) {
     Column(
         modifier
             .testTag("glass_loading_skeleton")
-            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(0f, 0f..1f) },
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate },
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         listOf(0.94f, 0.78f, 0.58f).forEach { fraction ->

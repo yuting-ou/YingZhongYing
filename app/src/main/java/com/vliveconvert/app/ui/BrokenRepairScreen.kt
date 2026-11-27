@@ -1,6 +1,5 @@
 package com.vliveconvert.app.ui
 
-import androidx.activity.compose.BackHandler
 import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.ui.theme.DesignTokens
 import androidx.compose.foundation.layout.Arrangement
@@ -174,7 +173,7 @@ fun BrokenRepairScreen(onBack: () -> Unit, hazeState: HazeState = rememberGlassH
     }
 
     LaunchedEffect(Unit) { startScan() }
-    BackHandler(enabled = !fixing) { onBack() }
+    RepairBackHandler(busy = fixing, onBack = onBack)
 
     Box(Modifier.fillMaxSize()) {
         Column(

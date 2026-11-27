@@ -8,7 +8,6 @@ import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.LruCache
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -61,6 +60,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -116,6 +116,7 @@ internal fun SharedTransitionScope.OriginalViewer(
     animatedVisibilityScope: AnimatedVisibilityScope,
     selectedIds: Set<Long>,
     onToggleSelected: (MediaItem) -> Unit,
+    onBackActionChanged: (backAction: (() -> Unit)?) -> Unit,
     onClose: () -> Unit
 ) {
     if (items.isEmpty()) return
@@ -151,8 +152,13 @@ internal fun SharedTransitionScope.OriginalViewer(
         }
     }
 
-    BackHandler {
-        if (scale.value > 1.01f) resetZoom() else onClose()
+    val latestResetZoom = rememberUpdatedState(resetZoom)
+    val latestOnClose = rememberUpdatedState(onClose)
+    DisposableEffect(onBackActionChanged) {
+        onBackActionChanged {
+            if (scale.value > 1.01f) latestResetZoom.value() else latestOnClose.value()
+        }
+        onDispose { onBackActionChanged(null) }
     }
     LaunchedEffect(page) {
         scale.snapTo(1f)
