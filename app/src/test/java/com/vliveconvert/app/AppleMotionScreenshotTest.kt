@@ -4,7 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.ui.GlassLevel
 import com.vliveconvert.app.ui.GlassSamplingBackdrop
 import com.vliveconvert.app.ui.GlassLoadingSkeleton
+import com.vliveconvert.app.ui.GlassEmptyErrorState
 import com.vliveconvert.app.ui.LocalGlassCompatibility
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.HazeGlassCard
@@ -99,6 +103,49 @@ class AppleMotionScreenshotTest {
         }
         compose.waitForIdle()
         shot("apple_bc_main_dark")
+    }
+
+    @Test
+    fun shotStateSamples() {
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                Column(
+                    Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.weight(1f)) {
+                            GlassLoadingSkeleton(Modifier.fillMaxWidth())
+                        }
+                        Box(Modifier.weight(1f)) {
+                            GlassEmptyErrorState(
+                                title = "没有匹配的照片",
+                                description = "换个文件名关键词试试"
+                            )
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.weight(1f)) {
+                            GlassEmptyErrorState(
+                                title = "扫描相册失败",
+                                description = "请检查存储权限",
+                                error = true,
+                                actionLabel = "重新扫描",
+                                onAction = {}
+                            )
+                        }
+                        Box(Modifier.weight(1f)) {
+                            GlassEmptyErrorState(
+                                title = "全部正常",
+                                description = "位置信息已恢复"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        shot("apple_bc_states")
     }
 
     @Test
