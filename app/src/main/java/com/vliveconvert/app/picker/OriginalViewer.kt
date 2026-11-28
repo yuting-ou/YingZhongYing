@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -81,8 +82,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -94,6 +97,7 @@ import com.vliveconvert.app.ui.HazeGlassCard
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MediaThumbnail
 import com.vliveconvert.app.ui.theme.DesignTokens
+import com.vliveconvert.app.ui.motion.MotionTokens
 import com.vliveconvert.app.ui.glassBackdropSource
 import com.vliveconvert.app.ui.rememberGlassHazeState
 import kotlinx.coroutines.Dispatchers
@@ -102,6 +106,13 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+
+internal fun shouldDismissViewer(
+    offsetPx: Float,
+    heightPx: Float,
+    velocityPxSec: Float
+): Boolean = heightPx > 0f &&
+    (offsetPx >= heightPx * 0.18f || velocityPxSec >= 1200f)
 
 /**
  * 全屏原图查看：点网格左上角放大镜进入。
@@ -136,6 +147,8 @@ internal fun SharedTransitionScope.OriginalViewer(
     val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
     // 翻页开关单独存状态：直接在组合里读 scale.value 会让每帧平移都重组整个 Pager
     var zoomed by remember { mutableStateOf(false) }
+    var viewerDragging by remember { mutableStateOf(false) }
+    val dismissOffset = remember { Animatable(0f) }
     var container by remember { mutableStateOf(IntSize.Zero) }
     var imageSize by remember { mutableStateOf(IntSize.Zero) }
 
@@ -171,7 +184,19 @@ internal fun SharedTransitionScope.OriginalViewer(
     }
     ForceLightSystemBars()
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .testTag("original_viewer")
+            .offset { IntOffset(0, dismissOffset.value.roundToInt()) }
+            .graphicsLayer {
+                val progress = if (container.height > 0) {
+                    (dismissOffset.value / container.height).coerceIn(0f, 1f)
+                } else 0f
+                alpha = 1f - progress * 0.35f
+            }
+            .background(Color.Black)
+    ) {
         Box(Modifier.fillMaxSize().glassBackdropSource(hazeState)) {
             Box(
                 Modifier
@@ -187,6 +212,9 @@ internal fun SharedTransitionScope.OriginalViewer(
                             val down = awaitFirstDown(requireUnconsumed = false)
                             var up: PointerInputChange? = null
                             var moved = false
+                            var verticalDismiss = false
+                            var lastMoveUptime = down.uptimeMillis
+                            var velocityPxSec = 0f
                             // 手势内同步累加的当前变换：Animatable 只能在协程里写，
                             // 若每条事件都读回 offset.value 再写，同一帧内的多条事件会读到
                             // 同一个旧值、后写覆盖前写 ⇒ 平移丢掉大半位移（实测 300px 只走 120px）
@@ -197,8 +225,29 @@ internal fun SharedTransitionScope.OriginalViewer(
                                 val pressed = event.changes.count { it.pressed }
                                 val oldScale = liveScale
                                 val newScale = (oldScale * event.calculateZoom()).coerceIn(1f, 4f)
-                                val shouldHandle = pressed >= 2 || oldScale > 1.01f
-                                if (shouldHandle) {
+                                val downChange = event.changes.firstOrNull { it.id == down.id }
+                                if (!verticalDismiss && pressed == 1 && liveScale <= 1.01f &&
+                                    downChange != null) {
+                                    val dy = downChange.position.y - downChange.previousPosition.y
+                                    val dx = downChange.position.x - downChange.previousPosition.x
+                                    if (dy > 0f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f &&
+                                        downChange.position.y - down.position.y > viewConfiguration.touchSlop) {
+                                        verticalDismiss = true
+                                        viewerDragging = true
+                                    }
+                                }
+                                if (verticalDismiss && pressed == 1 && downChange != null) {
+                                    val dy = downChange.position.y - downChange.previousPosition.y
+                                    val now = downChange.uptimeMillis
+                                    val dt = (now - lastMoveUptime).coerceAtLeast(1L)
+                                    velocityPxSec = dy * 1000f / dt
+                                    lastMoveUptime = now
+                                    val target = (dismissOffset.value + dy)
+                                        .coerceIn(0f, container.height.toFloat())
+                                    scope.launch { dismissOffset.snapTo(target) }
+                                    moved = true
+                                    event.changes.forEach { it.consume() }
+                                } else if (pressed >= 2 || oldScale > 1.01f) {
                                     val centroid = event.calculateCentroid(useCurrent = true)
                                     val center = Offset(container.width / 2f, container.height / 2f)
                                     val pan = event.calculatePan()
@@ -271,6 +320,25 @@ internal fun SharedTransitionScope.OriginalViewer(
                                     lastTapPos = tap.position
                                 }
                             }
+                            if (verticalDismiss) {
+                                viewerDragging = false
+                                if (shouldDismissViewer(
+                                        dismissOffset.value,
+                                        container.height.toFloat(),
+                                        velocityPxSec
+                                    )
+                                ) {
+                                    latestOnClose.value()
+                                } else {
+                                    scope.launch {
+                                        dismissOffset.animateTo(
+                                            targetValue = 0f,
+                                            animationSpec = if (reduceMotion) snap()
+                                            else MotionTokens.Hero
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                     .graphicsLayer {
@@ -284,7 +352,7 @@ internal fun SharedTransitionScope.OriginalViewer(
                 HorizontalPager(
                     state = pager,
                     modifier = Modifier.fillMaxSize(),
-                    userScrollEnabled = !zoomed,
+                    userScrollEnabled = !zoomed && !viewerDragging,
                     key = { items[it].id }
                 ) { index ->
                     val sharedModifier = if (index == initialIndex) {
@@ -293,7 +361,7 @@ internal fun SharedTransitionScope.OriginalViewer(
                             animatedVisibilityScope = animatedVisibilityScope,
                             boundsTransform = { _, _ ->
                                 if (reduceMotion) snap()
-                                else spring(dampingRatio = 0.82f, stiffness = 420f)
+                                else spring(dampingRatio = 0.88f, stiffness = 340f)
                             }
                         )
                     } else {

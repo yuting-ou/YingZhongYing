@@ -771,6 +771,12 @@ fun PickerScreen(
     }
 }
 
+internal fun shouldDismissSheet(
+    offsetPx: Float,
+    thresholdPx: Float,
+    velocityPxSec: Float
+): Boolean = offsetPx >= thresholdPx || velocityPxSec >= 900f
+
 /** 相册切换面板：替代原先光秃秃的下拉菜单，与整体玻璃/圆角语言一致 */
 @Composable
 private fun AlbumSheet(
@@ -818,14 +824,14 @@ private fun AlbumSheet(
                     .draggable(
                         state = dragState,
                         orientation = Orientation.Vertical,
-                        onDragStopped = {
-                            if (dragOffset >= dismissThresholdPx) {
+                        onDragStopped = { velocity ->
+                            if (shouldDismissSheet(dragOffset, dismissThresholdPx, velocity)) {
                                 onDismiss()
                             } else {
                                 scope.launch {
                                     Animatable(dragOffset).animateTo(
                                         targetValue = 0f,
-                                        animationSpec = if (reduceMotion) snap() else MotionTokens.Standard
+                                        animationSpec = if (reduceMotion) snap() else MotionTokens.Hero
                                     )
                                 }
                             }

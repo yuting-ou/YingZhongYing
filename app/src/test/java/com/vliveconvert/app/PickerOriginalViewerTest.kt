@@ -3,20 +3,26 @@ package com.vliveconvert.app
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import com.vliveconvert.app.picker.AlbumInfo
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
 import com.vliveconvert.app.picker.PickerScanner
 import com.vliveconvert.app.picker.PickerScreen
+import com.vliveconvert.app.picker.shouldDismissViewer
 import com.vliveconvert.app.ui.LocalReduceMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -144,6 +150,36 @@ class PickerOriginalViewerTest {
         assertEquals("查看器退场的 120ms 内不得再吞一次返回", 1, parentBacks)
         assertTrue(
             "查看器应已关闭",
+            compose.onAllNodesWithContentDescription("关闭预览").fetchSemanticsNodes().isEmpty()
+        )
+    }
+
+    @Test
+    fun viewerDismissalUsesDistanceOrVelocity() {
+        assertTrue(shouldDismissViewer(200f, 1000f, 0f))
+        assertTrue(shouldDismissViewer(20f, 1000f, 1200f))
+        assertFalse(shouldDismissViewer(20f, 1000f, 100f))
+        assertFalse(shouldDismissViewer(20f, 0f, 1200f))
+    }
+
+    @Test
+    fun dragDownDismissesViewer() {
+        render(listOf(media(1)))
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("original_viewer").performTouchInput {
+            swipe(
+                start = Offset(center.x, 80f),
+                end = Offset(center.x, height - 80f),
+                durationMillis = 600
+            )
+        }
+        compose.mainClock.advanceTimeBy(700)
+        compose.waitForIdle()
+
+        assertTrue(
+            "下拉超过阈值后查看器必须关闭",
             compose.onAllNodesWithContentDescription("关闭预览").fetchSemanticsNodes().isEmpty()
         )
     }
