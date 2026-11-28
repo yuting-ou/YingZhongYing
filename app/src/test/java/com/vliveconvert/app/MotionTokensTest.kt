@@ -2,6 +2,7 @@ package com.vliveconvert.app
 
 import androidx.compose.animation.core.SnapSpec
 import androidx.compose.ui.unit.IntSize
+import com.vliveconvert.app.ui.statusAnimationSlot
 import com.vliveconvert.app.ui.motion.MotionTokens
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,6 +50,15 @@ class MotionTokensTest {
         assertEquals(1, MotionTokens.maxConcurrentStatusAnimations(1))
         assertEquals(2, MotionTokens.maxConcurrentStatusAnimations(6))
         assertEquals(1, MotionTokens.maxConcurrentStatusAnimations(24))
+    }
+
+    @Test
+    fun statusAnimationSlotsNeverExceedBatchBudget() {
+        assertEquals(0, statusAnimationSlot(0, 6))
+        assertEquals(1, statusAnimationSlot(1, 6))
+        assertEquals(-1, statusAnimationSlot(2, 6))
+        assertEquals(0, statusAnimationSlot(0, 24))
+        assertEquals(-1, statusAnimationSlot(1, 24))
     }
 
     @Test

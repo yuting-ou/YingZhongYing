@@ -169,4 +169,26 @@ class MainScreenGridModeTest {
 
         prefs().edit().remove("main_view_mode").commit()
     }
+
+    @Test
+    fun largeBatchLimitsAnimatedGridSpinners() {
+        prefs().edit().putString("main_view_mode", "grid").commit()
+        val queue = items(24).map { it.copy(status = "转换中…") }
+        compose.setContent {
+            TestMainScreen(queue = queue, converting = true, reduceMotion = false)
+        }
+        compose.waitForIdle()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithContentDescription("动态转换进度")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue(
+            "24 张同时忙碌时最多一个动态转圈，实际=" +
+                compose.onAllNodesWithContentDescription("动态转换进度")
+                    .fetchSemanticsNodes().size,
+            compose.onAllNodesWithContentDescription("动态转换进度")
+                .fetchSemanticsNodes().size <= 1
+        )
+        prefs().edit().remove("main_view_mode").commit()
+    }
 }
