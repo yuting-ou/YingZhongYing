@@ -96,6 +96,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -117,6 +118,16 @@ import com.vliveconvert.app.ui.theme.statusColors
 import com.vliveconvert.app.ui.motion.MotionTokens
 import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.ui.theme.DesignTokens
+
+internal fun largeTitleCollapse(
+    firstVisibleItem: Int,
+    offsetPx: Int,
+    reduceMotion: Boolean
+): Float = when {
+    firstVisibleItem > 0 -> 0f
+    reduceMotion -> if (offsetPx > 0) 0f else 1f
+    else -> (1f - offsetPx.coerceIn(0, 240) / 240f).coerceIn(0f, 1f)
+}
 
 /**
  * 主界面：待转换列表 + 开始转换。
@@ -186,6 +197,16 @@ fun MainScreen(
     // 滚动降成本（opt-in，默认关）：滚动期间临时降低玻璃采样，停手即恢复，观感不丢。
     // 滚动状态在 GlassScrollPauseScope 内读取——MainScreen 不随滚动起停重组
     GlassScrollPauseScope(listState, gridState) {
+    val reduceMotion = LocalReduceMotion.current
+    val titleCollapse by remember(viewMode) {
+        derivedStateOf {
+            if (viewMode == "grid") {
+                largeTitleCollapse(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, reduceMotion)
+            } else {
+                largeTitleCollapse(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, reduceMotion)
+            }
+        }
+    }
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -201,7 +222,17 @@ fun MainScreen(
                 .padding(start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(
+                Modifier
+                    .weight(1f)
+                    .graphicsLayer {
+                        val scale = 0.90f + 0.10f * titleCollapse
+                        scaleX = scale
+                        scaleY = scale
+                        alpha = 0.78f + 0.22f * titleCollapse
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    }
+            ) {
                 Text(appName, style = glassTitleStyle())
                 Spacer(Modifier.height(2.dp))
                 Text(stringResource(R.string.app_tagline), style = glassSubtitleStyle())
@@ -281,7 +312,6 @@ fun MainScreen(
 
         // ── 状态摘要（长文案折叠，点击看详情） ──
         // 文案更新（如一次转换结束的「转换完成：…」）时柔和淡入上移，而非硬切
-        val reduceMotion = LocalReduceMotion.current
         AnimatedContent(
             targetState = statusText,
             transitionSpec = {

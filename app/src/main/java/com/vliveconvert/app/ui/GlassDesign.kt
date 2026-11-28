@@ -1080,6 +1080,7 @@ fun GlassIconTile(
     /** 点击语义挂到 48dp 触控代理上（传入后内层图标应传 null，避免读屏重复播报） */
     contentDescription: String? = null,
     onClick: (() -> Unit)? = null,
+    level: GlassLevel = GlassLevel.Thin,
     content: @Composable BoxScope.() -> Unit
 ) {
     val dark = isDarkGlass()
@@ -1112,11 +1113,11 @@ fun GlassIconTile(
             }
         }
     }
-    val glassAlpha = if (hazeOn) 0.52f else 1f
-    val top = if (tint != null) tint.copy(alpha = (if (dark) 0.34f else 0.26f) * glassAlpha)
-              else Color.White.copy(alpha = (if (dark) 0.16f else 0.72f) * glassAlpha)
-    val bottom = if (tint != null) tint.copy(alpha = (if (dark) 0.12f else 0.08f) * glassAlpha)
-                 else Color.White.copy(alpha = (if (dark) 0.08f else 0.34f) * glassAlpha)
+    val fill = glassFill(level, dark, hazeOn, dense = false)
+    val top = if (tint != null) tint.copy(alpha = if (dark) 0.34f else 0.26f)
+              else Color.White.copy(alpha = fill.top)
+    val bottom = if (tint != null) tint.copy(alpha = if (dark) 0.12f else 0.08f)
+                 else Color.White.copy(alpha = fill.bottom)
     val edgeTop = Color.White.copy(alpha = if (dark) 0.28f else 0.95f)
     val edgeBottom = Color.White.copy(alpha = if (dark) 0.06f else 0.30f)
     val tile = Modifier
