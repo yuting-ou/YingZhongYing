@@ -407,6 +407,7 @@ fun InlineTextButton(
                 scaleX = pressScale
                 scaleY = pressScale
             }
+            .heightIn(min = 48.dp)
             .minimumInteractiveComponentSize()
             .clickableNoRipple(onClick, interaction),
         contentAlignment = Alignment.Center

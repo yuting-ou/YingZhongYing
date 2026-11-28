@@ -7,12 +7,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
+import com.vliveconvert.app.ui.GlassEmptyErrorState
 import com.vliveconvert.app.ui.GlassLoadingSkeleton
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.StateCrossfade
@@ -70,6 +73,37 @@ class StateUiTest {
         compose.waitForIdle()
         compose.onNodeWithText("成功态").assertExists()
         compose.onNodeWithText("错误态").assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyErrorStateExposesHeadingStateAndAccessibleAction() {
+        var clicks = 0
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                GlassEmptyErrorState(
+                    title = "扫描相册失败",
+                    description = "请检查存储权限",
+                    error = true,
+                    actionLabel = "重新扫描",
+                    onAction = { clicks++ }
+                )
+            }
+        }
+        compose.waitForIdle()
+
+        val title = compose.onNodeWithText("扫描相册失败").fetchSemanticsNode()
+        org.junit.Assert.assertEquals(
+            "错误",
+            title.config[SemanticsProperties.StateDescription]
+        )
+        org.junit.Assert.assertTrue(
+            "状态标题应作为读屏标题",
+            title.config.contains(SemanticsProperties.Heading)
+        )
+        compose.onNodeWithText("重新扫描")
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        org.junit.Assert.assertEquals(1, clicks)
     }
 
     @Test

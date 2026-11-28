@@ -6,15 +6,20 @@ import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.ui.GlassLevel
 import com.vliveconvert.app.ui.GlassSamplingBackdrop
+import com.vliveconvert.app.ui.GlassLoadingSkeleton
+import com.vliveconvert.app.ui.LocalGlassCompatibility
+import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.HazeGlassCard
 import com.vliveconvert.app.ui.glassBackdropSource
 import com.vliveconvert.app.ui.largeTitleCollapse
@@ -40,6 +45,17 @@ class AppleMotionScreenshotTest {
 
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private fun shot(name: String) {
+        shadowOf(Looper.getMainLooper()).idle()
+        val view = compose.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        File("build/ui-shots").mkdirs()
+        File("build/ui-shots/$name.png").outputStream().use {
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
 
     @Test
     fun largeTitleCollapseIsContinuousAndReduceMotionSnaps() {
@@ -82,13 +98,24 @@ class AppleMotionScreenshotTest {
             }
         }
         compose.waitForIdle()
-        shadowOf(Looper.getMainLooper()).idle()
-        val view = compose.activity.window.decorView
-        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bmp))
-        File("build/ui-shots").mkdirs()
-        File("build/ui-shots/apple_bc_main_dark.png").outputStream().use {
-            bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+        shot("apple_bc_main_dark")
+    }
+
+    @Test
+    fun shotCompatibilitySkeleton() {
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                CompositionLocalProvider(
+                    LocalGlassCompatibility provides true,
+                    LocalReduceMotion provides true
+                ) {
+                    Box(Modifier.fillMaxSize().padding(24.dp)) {
+                        GlassLoadingSkeleton(Modifier.fillMaxWidth())
+                    }
+                }
+            }
         }
+        compose.waitForIdle()
+        shot("apple_bc_compatibility_skeleton")
     }
 }
