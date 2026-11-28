@@ -7,7 +7,6 @@ import android.util.LruCache
 import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloat
@@ -90,15 +89,14 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 @Composable
 internal fun rememberPressScale(
     interactionSource: MutableInteractionSource,
-    pressedScale: Float = 0.97f,
-    spec: FiniteAnimationSpec<Float> = MotionTokens.Press
+    pressedScale: Float = 0.97f
 ): androidx.compose.runtime.State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
     val reduceMotion = LocalReduceMotion.current
     return androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = if (reduceMotion) androidx.compose.animation.core.snap()
-        else spec,
+        else MotionTokens.Snappy,
         label = "pressScale"
     )
 }
@@ -145,11 +143,8 @@ object ThumbConcurrency {
     val current: CoroutineDispatcher get() = dispatcher
 }
 
-internal fun shouldAnimateThumbnailPulse(
-    reduceMotion: Boolean,
-    scrollPaused: Boolean,
-    compatibility: Boolean = false
-): Boolean = MotionTokens.motionBudgetAllowsInfinite(reduceMotion, scrollPaused, compatibility)
+internal fun shouldAnimateThumbnailPulse(reduceMotion: Boolean, scrollPaused: Boolean): Boolean =
+    !reduceMotion && !scrollPaused
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 val thumbDispatcher: CoroutineDispatcher get() = ThumbConcurrency.current
@@ -163,7 +158,6 @@ val thumbDispatcher: CoroutineDispatcher get() = ThumbConcurrency.current
 fun MediaThumbnail(uri: Uri, resolver: ContentResolver, modifier: Modifier) {
     val reduceMotion = LocalReduceMotion.current
     val scrollPaused = LocalGlassScrollPaused.current
-    val compatibility = LocalGlassCompatibility.current
     var failed by remember(uri) { mutableStateOf(false) }
     val bitmap by produceState<Bitmap?>(null, uri) {
         val key = uri.toString()
@@ -222,7 +216,7 @@ fun MediaThumbnail(uri: Uri, resolver: ContentResolver, modifier: Modifier) {
         // 加载占位：呼吸底色 + 淡淡的「照片」字形。
         // 只给一块灰板会让人以为「这里本来就空」，画上轮廓才读得出是在等缩略图
         if (bitmap == null && !failed) {
-            val pulse = if (!shouldAnimateThumbnailPulse(reduceMotion, scrollPaused, compatibility)) 0.65f
+            val pulse = if (!shouldAnimateThumbnailPulse(reduceMotion, scrollPaused)) 0.65f
             else rememberInfiniteTransition(label = "thumbPulse").animateFloat(
                 initialValue = 0.45f,
                 targetValue = 0.9f,
@@ -407,7 +401,6 @@ fun InlineTextButton(
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .heightIn(min = 48.dp)
             .minimumInteractiveComponentSize()
             .clickableNoRipple(onClick, interaction),
         contentAlignment = Alignment.Center

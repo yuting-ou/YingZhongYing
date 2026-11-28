@@ -4,15 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.ui.ConvertItem
-import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MainScreen
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import org.junit.Rule
@@ -55,52 +50,41 @@ class MainScreenViewModeScreenshotTest {
             done = i == 2)
     }
 
-    private fun setContent(
-        darkTheme: Boolean = false,
-        fontScale: Float = 1f,
-        reduceMotion: Boolean = false
-    ) {
+    private fun setContent() {
         compose.setContent {
-            VLiveConvertTheme(darkTheme = darkTheme, dynamicColor = false) {
-                val density = LocalDensity.current
-                CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale),
-                    LocalReduceMotion provides reduceMotion
-                ) {
-                    MainScreen(
-                        items = items(9),
-                        appName = "影中影",
-                        statusText = "",
-                        isConverting = false,
-                        finishedBeat = false,
-                        progress = 0f,
-                        progressDetail = "",
-                        pendingRestoreCount = 0,
-                        onRestoreOriginals = {},
-                        locationMissing = false,
-                        onGrantLocation = {},
-                        reconvertCount = 0,
-                        onReconvertLostGps = {},
-                        onReconvertItem = {},
-                        outputRelPath = "Pictures/VLiveConvert",
-                        moveToCamera = true,
-                        deleteOriginal = true,
-                        onOpenSettings = {},
-                        onShowStatusDetail = {},
-                        onCancelConvert = {},
-                        onAddMore = {},
-                        onStartConvert = {},
-                        onClearAll = {},
-                        failedCount = 0,
-                        onRetryFailed = {},
-                        onShareItem = {},
-                        onRemove = {}
-                    )
-                }
+            VLiveConvertTheme(dynamicColor = false) {
+                MainScreen(
+                    items = items(9),
+                    appName = "影中影",
+                    statusText = "",
+                    isConverting = false,
+                    finishedBeat = false,
+                    progress = 0f,
+                    progressDetail = "",
+                    pendingRestoreCount = 0,
+                    onRestoreOriginals = {},
+                    locationMissing = false,
+                    onGrantLocation = {},
+                    reconvertCount = 0,
+                    onReconvertLostGps = {},
+                    onReconvertItem = {},
+                    outputRelPath = "Pictures/VLiveConvert",
+                    moveToCamera = true,
+                    deleteOriginal = true,
+                    onOpenSettings = {},
+                    onShowStatusDetail = {},
+                    onCancelConvert = {},
+                    onAddMore = {},
+                    onStartConvert = {},
+                    onClearAll = {},
+                    failedCount = 0,
+                    onRetryFailed = {},
+                    onShareItem = {},
+                    onRemove = {}
+                )
             }
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("apple_segmented_control").assertExists()
     }
 
     private fun prefs() = ApplicationProvider.getApplicationContext<VliveApp>()
@@ -119,14 +103,6 @@ class MainScreenViewModeScreenshotTest {
         prefs().edit().putString("main_view_mode", "grid").commit()
         setContent()
         shot("main_view_grid")
-        prefs().edit().remove("main_view_mode").commit()
-    }
-
-    @Test
-    fun shotGridDarkLargeFontReduceMotion() {
-        prefs().edit().putString("main_view_mode", "grid").commit()
-        setContent(darkTheme = true, fontScale = 2f, reduceMotion = true)
-        shot("apple_bc_main_dark_large_reduce")
         prefs().edit().remove("main_view_mode").commit()
     }
 }

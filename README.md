@@ -7,15 +7,15 @@
 > 是 [brovast/VLiveConvert](https://github.com/brovast/VLiveConvert) 的改进版（v2.0.0），
 > 基于 GPL-3.0 协议继续开源，改进内容见文末「改进版变更记录」。
 >
-> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test10) ——
-> 点开 `VivoLivePhoto-v3.0.0-test10.apk` 即可安装（**3.0 液态玻璃展示型 + 动效优先版** ·
-> 更强材质层级/边缘色散、Large Title、Apple 分段控件、下拉原图、批量动画预算；可从 2.8.0 正式版覆盖安装）。
-> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test10/VivoLivePhoto-v3.0.0-test10.apk) 下载，内容一致。
+> **下载 APK**：[Releases 页面](https://github.com/yuting-ou/YingZhongYing/releases/tag/v3.0.0-test9) ——
+> 点开 `VivoLivePhoto-v3.0.0-test9.apk` 即可安装（**3.0 苹果动效与液态玻璃打磨版** ·
+> 照片共享过渡/覆盖层返回/统一按压与状态编排/Thin-Regular-Thick 材质；可从 2.8.0 正式版覆盖安装）。
+> 亦可从 [Release 附件直链](https://github.com/yuting-ou/YingZhongYing/releases/download/v3.0.0-test9/VivoLivePhoto-v3.0.0-test9.apk) 下载，内容一致。
 >
-> **v3.0.0-test10**：Thin/Regular/Thick 玻璃进一步拉开通透度与边缘色散；主页 Large Title 随滚动收缩，
-> 列表/网格改为 Apple 式分段控件；原图支持下拉关闭，横翻与下拉按主轴锁定；设置卡片改为紧凑分组列表；
-> 大批量转换只保留有限动态 spinner/进度条；独立对抗审查发现的列表预算、手势主轴和减少动效缓存问题已修复。
-> **test1 闪退，请勿安装；test2～test9 已被本版取代。**
+> **v3.0.0-test9**：建立统一动效 token 与系统减少动效门控；网格照片到原图查看器连续共享过渡，
+> 覆盖层返回按可见层级执行，相册面板支持下拉关闭；筛选 chip 与弹窗补齐选中语义、48dp 热区和
+> 单次确认触觉；加载/空态/错误统一编排，滚动时停用缩略图与骨架循环动画。
+> **test1 闪退，请勿安装；test2～test8 已被本版取代。**
 >
 > **v3.0.0-test7**：补齐网格模式转换动效——忙碌暗幕、旋转弧、不确定进度条、状态交叉过渡、
 > 完成闪白与徽标弹入、失败抖动/触觉、网格结构动画；减少动效自动切静态。
@@ -227,18 +227,6 @@ app/src/main/java/com/vliveconvert/app/
 ```
 
 ## 改进版变更记录
-
-### v3.0.0-test10（液态玻璃展示型 + 动效优先）
-
-- Thin / Regular / Thick 映射进一步增强，加入受画质与兼容模式控制的冷暖边缘色散。
-- 主页 Large Title 随列表/网格滚动收缩；顶部图标默认 Thin，底部 Dock 使用 Thick。
-- 列表/网格改为 Apple 式分段控件，具备 Role.Tab、选中语义与 48dp 热区。
-- 原图查看器支持下拉关闭，横向 pager 与下拉按累计主轴锁定，缩放/平移逻辑保持。
-- 相册面板按位移或速度关闭；页面转场增加轻微缩放与 Hero 弹簧。
-- 设置卡片改为图标、标题、说明与控件同行排列，减少嵌套卡片。
-- 大批量列表/网格转换只分配有限动态进度名额，滚动、兼容、减少动效时静态显示。
-- 空错态补齐读屏标题、状态语义与 48dp 主动作；骨架屏保持 Indeterminate。
-- 独立对抗审查发现的列表预算、 Viewer 手势主轴与大标题减少动效缓存问题已修复。
 
 ### v3.0.0-test9（苹果动效系统 · 液态玻璃打磨）
 

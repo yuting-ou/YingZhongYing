@@ -41,6 +41,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -464,17 +465,17 @@ internal fun SettingsScreen(
 
 @Composable
 private fun SettingsSection(title: String) {
-    Spacer(Modifier.height(20.dp))
+    Spacer(Modifier.height(24.dp))
     Text(title, style = glassSectionLabelStyle(),
         modifier = Modifier
             .semantics { heading() }
-            .padding(start = 12.dp, bottom = 6.dp))
+            .padding(start = 12.dp, bottom = 8.dp))
 }
 
 @Composable
 private fun SettingsCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    GlassCard(modifier.fillMaxWidth(), radius = 20.dp,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), content = content)
+    GlassCard(modifier.fillMaxWidth(), radius = 24.dp,
+        contentPadding = PaddingValues(12.dp), content = content)
 }
 
 @Composable
@@ -526,21 +527,19 @@ private fun SettingsToolCard(
     SettingsCard(modifier
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
-        .clickable(interactionSource = interaction, indication = null,
+        .clickable(interactionSource = interaction, indication = LocalIndication.current,
             role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = settingsCardTitleStyle(),
-                    color = if (destructive && available) accent else MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.height(2.dp))
-                Text(description, style = settingsDescriptionStyle(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(8.dp))
             SettingsGlyph(icon, accent)
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.weight(1f))
             SettingsChevron(MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Spacer(Modifier.height(12.dp))
+        Text(title, style = settingsCardTitleStyle(),
+            color = if (destructive && available) accent else MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(4.dp))
+        Text(description, style = settingsDescriptionStyle(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -563,20 +562,11 @@ private fun SettingsToggleCard(
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
         .toggleable(value = checked, enabled = enabled, role = Role.Switch,
-            interactionSource = interaction, indication = null,
+            interactionSource = interaction, indication = LocalIndication.current,
             onValueChange = onToggle)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, style = settingsCardTitleStyle(),
-                    color = if (enabled) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(2.dp))
-                Text(description, style = settingsDescriptionStyle(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.width(8.dp))
             SettingsGlyph(icon, if (enabled) primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.weight(1f))
             Switch(
                 checked = checked, onCheckedChange = null, enabled = enabled,
                 colors = SwitchDefaults.colors(
@@ -591,6 +581,12 @@ private fun SettingsToggleCard(
                 )
             )
         }
+        Spacer(Modifier.height(12.dp))
+        Text(title, style = settingsCardTitleStyle(),
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Text(description, style = settingsDescriptionStyle(),
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -601,7 +597,7 @@ private fun SettingsLinkCard(title: String, description: String, onClick: () -> 
     SettingsCard(Modifier
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
-        .clickable(interactionSource = interaction, indication = null,
+        .clickable(interactionSource = interaction, indication = LocalIndication.current,
             role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -631,10 +627,10 @@ private fun SettingsChevron(color: Color) {
     }
 }
 
-private fun settingsCardTitleStyle() = TextStyle(fontSize = DesignTokens.Body, lineHeight = 21.sp,
+private fun settingsCardTitleStyle() = TextStyle(fontSize = 15.sp, lineHeight = 20.sp,
     fontWeight = FontWeight.SemiBold)
 
-private fun settingsDescriptionStyle() = TextStyle(fontSize = DesignTokens.Caption, lineHeight = 17.sp)
+private fun settingsDescriptionStyle() = TextStyle(fontSize = 12.sp, lineHeight = 18.sp)
 
 /** 性能旋钮行：标题 + 当前值 + 滑杆（读屏读「标题，当前值」）。
  *  动效：程序性变更（点预设/开关）时旋钮弹簧滑移到新值，拖动中直接跟手不打架；

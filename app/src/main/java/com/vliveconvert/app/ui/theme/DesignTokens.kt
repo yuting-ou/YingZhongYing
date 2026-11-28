@@ -71,9 +71,4 @@ object DesignTokens {
     val SectionSub = 12.sp
     /** 工具行主文本 */
     val ToolRowText = 13.sp
-    /** Apple 式信息层级：大正文/正文/辅助/计数 */
-    val BodyLarge = 17.sp
-    val Body = 15.sp
-    val Caption = 12.sp
-    val Metric = 20.sp
 }

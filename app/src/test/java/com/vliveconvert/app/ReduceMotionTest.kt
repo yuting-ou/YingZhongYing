@@ -13,8 +13,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.vliveconvert.app.ui.GlassDialog
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.MotionPrefs
-import com.vliveconvert.app.ui.shouldAnimateSkeleton
-import com.vliveconvert.app.ui.shouldAnimateThumbnailPulse
 import com.vliveconvert.app.ui.rememberGlassHazeState
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import org.junit.Assert.assertEquals
@@ -124,14 +122,6 @@ class ReduceMotionTest {
         assertTrue("系统移除动画必须自动等效开启", MotionPrefs.effective)
         MotionPrefs.systemAnimatorOff = false
         assertFalse(MotionPrefs.effective)
-    }
-
-    @Test
-    fun compatibilityModeStopsInfinitePlaceholderMotion() {
-        assertFalse(shouldAnimateThumbnailPulse(false, false, compatibility = true))
-        assertFalse(shouldAnimateSkeleton(false, false, compatibility = true))
-        assertTrue(shouldAnimateThumbnailPulse(false, false, compatibility = false))
-        assertTrue(shouldAnimateSkeleton(false, false, compatibility = false))
     }
 
     @Test

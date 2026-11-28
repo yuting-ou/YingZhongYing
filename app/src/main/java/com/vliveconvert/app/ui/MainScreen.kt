@@ -96,7 +96,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -118,21 +117,6 @@ import com.vliveconvert.app.ui.theme.statusColors
 import com.vliveconvert.app.ui.motion.MotionTokens
 import dev.chrisbanes.haze.HazeState
 import com.vliveconvert.app.ui.theme.DesignTokens
-
-internal fun largeTitleCollapse(
-    firstVisibleItem: Int,
-    offsetPx: Int,
-    reduceMotion: Boolean
-): Float = when {
-    firstVisibleItem > 0 -> 0f
-    reduceMotion -> if (offsetPx > 0) 0f else 1f
-    else -> (1f - offsetPx.coerceIn(0, 240) / 240f).coerceIn(0f, 1f)
-}
-
-internal fun statusAnimationSlot(busyOrdinal: Int, busyCount: Int): Int {
-    val limit = MotionTokens.maxConcurrentStatusAnimations(busyCount)
-    return if (busyOrdinal in 0 until limit) busyOrdinal else -1
-}
 
 /**
  * 主界面：待转换列表 + 开始转换。
@@ -182,20 +166,6 @@ fun MainScreen(
     hazeState: HazeState = rememberGlassHazeState()
 ) {
     val pendingCount = items.count { !it.done && !it.failed }
-    val busyCount = items.count { isBusyStatus(it.status) }
-    val busySlotLimit = MotionTokens.maxConcurrentStatusAnimations(busyCount)
-    val busySlotByKey = remember(items) {
-        var ordinal = 0
-        items.associate { ci ->
-            if (isBusyStatus(ci.status)) {
-                val slot = statusAnimationSlot(ordinal, busyCount)
-                ordinal++
-                ci.item.key to slot
-            } else {
-                ci.item.key to -1
-            }
-        }
-    }
     // 列表滚动到 Dock 下方时，最后一行仍能滚出来；只有确实滚得动时才垫，
     // 否则 5 条照片也会在玻璃面板尾部拖出一截约 110dp 的空白
     val dockInset = if (isConverting || finishedBeat) 176.dp else 132.dp
@@ -216,16 +186,6 @@ fun MainScreen(
     // 滚动降成本（opt-in，默认关）：滚动期间临时降低玻璃采样，停手即恢复，观感不丢。
     // 滚动状态在 GlassScrollPauseScope 内读取——MainScreen 不随滚动起停重组
     GlassScrollPauseScope(listState, gridState) {
-    val reduceMotion = LocalReduceMotion.current
-    val titleCollapse by remember(viewMode, reduceMotion) {
-        derivedStateOf {
-            if (viewMode == "grid") {
-                largeTitleCollapse(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, reduceMotion)
-            } else {
-                largeTitleCollapse(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, reduceMotion)
-            }
-        }
-    }
     Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -241,17 +201,7 @@ fun MainScreen(
                 .padding(start = DesignTokens.ScreenHMargin, end = DesignTokens.ScreenHMargin, top = 10.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                Modifier
-                    .weight(1f)
-                    .graphicsLayer {
-                        val scale = 0.90f + 0.10f * titleCollapse
-                        scaleX = scale
-                        scaleY = scale
-                        alpha = 0.78f + 0.22f * titleCollapse
-                        transformOrigin = TransformOrigin(0f, 0f)
-                    }
-            ) {
+            Column(Modifier.weight(1f)) {
                 Text(appName, style = glassTitleStyle())
                 Spacer(Modifier.height(2.dp))
                 Text(stringResource(R.string.app_tagline), style = glassSubtitleStyle())
@@ -331,6 +281,7 @@ fun MainScreen(
 
         // ── 状态摘要（长文案折叠，点击看详情） ──
         // 文案更新（如一次转换结束的「转换完成：…」）时柔和淡入上移，而非硬切
+        val reduceMotion = LocalReduceMotion.current
         AnimatedContent(
             targetState = statusText,
             transitionSpec = {
@@ -381,46 +332,45 @@ fun MainScreen(
             }
         }
 
-        // ── 列表头：计数与清空一行，视图模式使用独立分段控件 ──
+        // ── 列表头 ──
         if (items.isNotEmpty()) {
-            Column(
+            Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 12.dp, bottom = 6.dp)
+                    // end 6dp：「清空」在 48dp 触摸区内居中，自身留白约 10dp，6+10=16dp
+                    // 落到全页右基线（与左缘 16dp 对称）
+                    .padding(start = 16.dp, end = 12.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (isConverting) "转换中 · 共 ${items.size} 张"
-                        else "已选 ${items.size} 张",
-                        style = TextStyle(fontSize = DesignTokens.Metric,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    if (isConverting) "转换中 · 共 ${items.size} 张"
+                    else "已选 ${items.size} 张",
+                    style = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface)
+                )
+                Spacer(Modifier.weight(1f))
+                if (!isConverting && failedCount > 0) {
+                    InlineTextButton(
+                        text = "重试失败 $failedCount",
+                        contentColor = MaterialTheme.colorScheme.tertiary,
+                        onClick = onRetryFailed,
+                        style = TextStyle(fontSize = 14.sp)
                     )
-                    Spacer(Modifier.weight(1f))
-                    if (!isConverting && failedCount > 0) {
-                        InlineTextButton(
-                            text = "重试失败 $failedCount",
-                            contentColor = MaterialTheme.colorScheme.tertiary,
-                            onClick = onRetryFailed,
-                            style = TextStyle(fontSize = 14.sp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                    }
-                    if (!isConverting) {
-                        InlineTextButton(
-                            text = "清空",
-                            contentColor = MaterialTheme.colorScheme.primary,
-                            onClick = onClearAll,
-                            style = TextStyle(fontSize = 14.sp)
-                        )
-                    }
+                    Spacer(Modifier.width(12.dp))
                 }
                 if (!isConverting) {
-                    Spacer(Modifier.height(4.dp))
-                    AppleSegmentedControl(
-                        options = listOf("列表", "网格"),
-                        selectedIndex = if (viewMode == "grid") 1 else 0,
-                        onSelect = { index -> setViewMode(if (index == 1) "grid" else "list") }
+                    InlineTextButton(
+                        text = if (viewMode == "grid") "列表" else "网格",
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        onClick = { setViewMode(if (viewMode == "grid") "list" else "grid") },
+                        style = TextStyle(fontSize = 14.sp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    InlineTextButton(
+                        text = "清空",
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        onClick = onClearAll,
+                        style = TextStyle(fontSize = 14.sp)
                     )
                 }
             }
@@ -511,7 +461,6 @@ fun MainScreen(
                                                 fadeOutSpec = if (reduceMotion) null else tween(180)
                                             ),
                                             ci = ci,
-                                            animateStatus = (busySlotByKey[ci.item.key] ?: -1) in 0 until busySlotLimit,
                                             onRemove = { onRemove(ci) }
                                         )
                                     }
@@ -533,7 +482,6 @@ fun MainScreen(
                                                 fadeOutSpec = if (reduceMotion) null else tween(180)
                                             ),
                                             ci = ci,
-                                            animateStatus = (busySlotByKey[ci.item.key] ?: -1) in 0 until busySlotLimit,
                                             onRemove = { onRemove(ci) },
                                             onReconvert = { onReconvertItem(ci) },
                                             onShare = { onShareItem(ci) }
@@ -848,16 +796,10 @@ private fun BusyProgressArc(
     modifier: Modifier,
     color: Color,
     diameter: androidx.compose.ui.unit.Dp = 54.dp,
-    strokeWidth: androidx.compose.ui.unit.Dp = 2.5.dp,
-    animate: Boolean = true
+    strokeWidth: androidx.compose.ui.unit.Dp = 2.5.dp
 ) {
     val reduceMotion = LocalReduceMotion.current
-    val allowInfinite = MotionTokens.motionBudgetAllowsInfinite(
-        reduceMotion = reduceMotion,
-        scrollPaused = LocalGlassScrollPaused.current,
-        compatibility = LocalGlassCompatibility.current
-    )
-    val angle = if (!animate || !allowInfinite) 0f else {
+    val angle = if (reduceMotion) 0f else {
         val animated by rememberInfiniteTransition(label = "convertRing").animateFloat(
             initialValue = 0f,
             targetValue = 360f,
@@ -868,14 +810,7 @@ private fun BusyProgressArc(
         )
         animated
     }
-    val animated = animate && allowInfinite
-    Canvas(
-        modifier
-            .size(diameter)
-            .semantics {
-                if (animated) contentDescription = "动态转换进度"
-            }
-    ) {
+    Canvas(modifier.size(diameter)) {
         val stroke = strokeWidth.toPx()
         val inset = stroke / 2f
         drawArc(
@@ -956,8 +891,7 @@ private fun ConvertItemRow(
     ci: ConvertItem,
     onRemove: () -> Unit,
     onReconvert: () -> Unit,
-    onShare: () -> Unit = {},
-    animateStatus: Boolean = true
+    onShare: () -> Unit = {}
 ) {
     val resolver = LocalContext.current.contentResolver
     val busy = isBusyStatus(ci.status)
@@ -1045,8 +979,7 @@ private fun ConvertItemRow(
                     if (busy) {
                         BusyProgressArc(
                             modifier = Modifier.align(Alignment.Center),
-                            color = busyColor,
-                            animate = animateStatus
+                            color = busyColor
                         )
                     }
                     Box(
@@ -1115,7 +1048,7 @@ private fun ConvertItemRow(
                     }
                     if (busy) {
                         Spacer(Modifier.height(5.dp))
-                        GlassIndeterminateBar(height = 3.dp, animate = animateStatus)
+                        GlassIndeterminateBar(height = 3.dp)
                     }
                 }
 
@@ -1168,8 +1101,7 @@ private fun ConvertItemRow(
 private fun ConvertItemGridCard(
     modifier: Modifier = Modifier,
     ci: ConvertItem,
-    onRemove: () -> Unit,
-    animateStatus: Boolean = true
+    onRemove: () -> Unit
 ) {
     val resolver = LocalContext.current.contentResolver
     val reduceMotion = LocalReduceMotion.current
@@ -1223,8 +1155,7 @@ private fun ConvertItemGridCard(
                     modifier = Modifier.align(Alignment.Center).testTag("grid_convert_busy"),
                     color = busyColor,
                     diameter = 64.dp,
-                    strokeWidth = 3.dp,
-                    animate = animateStatus
+                    strokeWidth = 3.dp
                 )
                 Text(
                     if (ci.status.startsWith("重新转换")) "重新转换中…" else "转换中…",

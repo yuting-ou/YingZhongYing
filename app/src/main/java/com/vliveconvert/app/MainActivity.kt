@@ -255,8 +255,7 @@ internal fun screenContentTransform(
     predictiveCommit: Boolean,
     returning: Boolean
 ): ContentTransform {
-    val move = spring<IntOffset>(dampingRatio = 0.88f, stiffness = 340f)
-    val scaleMove = spring<Float>(dampingRatio = 0.88f, stiffness = 340f)
+    val move = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 520f)
     val fadeInSpec = tween<Float>(180, easing = com.vliveconvert.app.ui.EaseOutStrong)
     val fadeOutSpec = tween<Float>(130)
     return if (predictiveCommit) {
@@ -278,11 +277,9 @@ internal fun screenContentTransform(
                         fadeOut(tween(200)) +
                         slideOutHorizontally(tween(220)) { it / 5 })
     } else {
-        (scaleIn(initialScale = 0.97f, animationSpec = scaleMove) +
-                slideInHorizontally(move) { it } +
+        (slideInHorizontally(move) { it } +
                 fadeIn(fadeInSpec)) togetherWith
-                (scaleOut(targetScale = 0.98f, animationSpec = scaleMove) +
-                        slideOutHorizontally(move) { -it / 4 } +
+                (slideOutHorizontally(move) { -it / 4 } +
                         fadeOut(fadeOutSpec))
     }
 }

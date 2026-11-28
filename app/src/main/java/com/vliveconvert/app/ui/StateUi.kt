@@ -37,10 +37,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.ui.motion.MotionTokens
@@ -67,18 +65,14 @@ internal fun <T> StateCrossfade(
     ) { content(it) }
 }
 
-internal fun shouldAnimateSkeleton(
-    reduceMotion: Boolean,
-    scrollPaused: Boolean,
-    compatibility: Boolean = false
-): Boolean = MotionTokens.motionBudgetAllowsInfinite(reduceMotion, scrollPaused, compatibility)
+internal fun shouldAnimateSkeleton(reduceMotion: Boolean, scrollPaused: Boolean): Boolean =
+    !reduceMotion && !scrollPaused
 
 @Composable
 internal fun GlassLoadingSkeleton(modifier: Modifier = Modifier) {
     val reduceMotion = LocalReduceMotion.current
     val scrollPaused = LocalGlassScrollPaused.current
-    val compatibility = LocalGlassCompatibility.current
-    val shimmer = if (shouldAnimateSkeleton(reduceMotion, scrollPaused, compatibility)) {
+    val shimmer = if (shouldAnimateSkeleton(reduceMotion, scrollPaused)) {
         rememberInfiniteTransition(label = "stateSkeleton").animateFloat(
             initialValue = 0f,
             targetValue = 1f,
@@ -149,21 +143,15 @@ internal fun GlassEmptyErrorState(
             style = MaterialTheme.typography.titleSmall,
             color = if (error) MaterialTheme.colorScheme.error
             else MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.semantics {
-                heading()
-                stateDescription = if (error) "错误" else "空状态"
-            }
+            textAlign = TextAlign.Center
         )
-        if (description.isNotBlank()) {
-            Spacer(Modifier.size(4.dp))
-            Text(
-                description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
+        Spacer(Modifier.size(4.dp))
+        Text(
+            description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.size(10.dp))
             InlineTextButton(

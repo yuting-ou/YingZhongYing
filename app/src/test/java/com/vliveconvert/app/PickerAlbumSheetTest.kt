@@ -18,7 +18,6 @@ import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
 import com.vliveconvert.app.picker.PickerScanner
 import com.vliveconvert.app.picker.PickerScreen
-import com.vliveconvert.app.picker.shouldDismissSheet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Rule
@@ -132,13 +131,6 @@ class PickerAlbumSheetTest {
         compose.waitForIdle()
         compose.onNodeWithText("全部相册").assertIsSelected()
         compose.onNodeWithText("当前相册").assertIsNotSelected()
-    }
-
-    @Test
-    fun sheetDismissalUsesDistanceOrVelocity() {
-        assertTrue(shouldDismissSheet(offsetPx = 100f, thresholdPx = 96f, velocityPxSec = 0f))
-        assertTrue(shouldDismissSheet(offsetPx = 10f, thresholdPx = 96f, velocityPxSec = 900f))
-        assertFalse(shouldDismissSheet(offsetPx = 10f, thresholdPx = 96f, velocityPxSec = 100f))
     }
 
     @Test

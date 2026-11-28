@@ -18,19 +18,12 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal fun shouldLoadAmbientPhoto(
-    enabled: Boolean,
-    compatibility: Boolean,
-    hasUri: Boolean
-): Boolean = enabled && !compatibility && hasUri
-
 @Composable
 internal fun rememberAmbientGlassPhoto(enabled: Boolean, uri: Uri?): ImageBitmap? {
     val context = LocalContext.current.applicationContext
-    val compatibility = LocalGlassCompatibility.current
-    return produceState<ImageBitmap?>(null, enabled, uri, context, compatibility) {
+    return produceState<ImageBitmap?>(null, enabled, uri, context) {
         value = null
-        if (uri == null || !shouldLoadAmbientPhoto(enabled, compatibility, hasUri = true)) return@produceState
+        if (!enabled || uri == null) return@produceState
         value = withContext(Dispatchers.IO) {
             try {
                 context.contentResolver.loadThumbnail(uri, Size(640, 640), null).asImageBitmap()
@@ -55,7 +48,7 @@ internal fun GlassSamplingBackdrop(image: ImageBitmap?) {
             )
             Box(
                 Modifier.fillMaxSize().background(
-                    Color.Black.copy(alpha = if (dark) 0.46f else 0.28f)
+                    Color.Black.copy(alpha = if (dark) 0.38f else 0.24f)
                 )
             )
         } else {

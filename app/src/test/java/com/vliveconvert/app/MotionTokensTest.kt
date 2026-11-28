@@ -2,10 +2,8 @@ package com.vliveconvert.app
 
 import androidx.compose.animation.core.SnapSpec
 import androidx.compose.ui.unit.IntSize
-import com.vliveconvert.app.ui.statusAnimationSlot
 import com.vliveconvert.app.ui.motion.MotionTokens
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,38 +25,6 @@ class MotionTokensTest {
         assertEquals(420f, MotionTokens.Standard.stiffness, 0.001f)
         assertEquals(0.90f, MotionTokens.Gentle.dampingRatio, 0.001f)
         assertEquals(300f, MotionTokens.Gentle.stiffness, 0.001f)
-    }
-
-    @Test
-    fun pressAndHeroSpringsMatchBcMotionWeight() {
-        assertEquals(0.66f, MotionTokens.Press.dampingRatio, 0.001f)
-        assertEquals(720f, MotionTokens.Press.stiffness, 0.001f)
-        assertEquals(0.88f, MotionTokens.Hero.dampingRatio, 0.001f)
-        assertEquals(340f, MotionTokens.Hero.stiffness, 0.001f)
-    }
-
-    @Test
-    fun infiniteMotionBudgetStopsForReduceScrollOrCompatibility() {
-        assertTrue(MotionTokens.motionBudgetAllowsInfinite(false, false, false))
-        assertFalse(MotionTokens.motionBudgetAllowsInfinite(true, false, false))
-        assertFalse(MotionTokens.motionBudgetAllowsInfinite(false, true, false))
-        assertFalse(MotionTokens.motionBudgetAllowsInfinite(false, false, true))
-    }
-
-    @Test
-    fun batchStatusAnimationBudgetScalesDown() {
-        assertEquals(1, MotionTokens.maxConcurrentStatusAnimations(1))
-        assertEquals(2, MotionTokens.maxConcurrentStatusAnimations(6))
-        assertEquals(1, MotionTokens.maxConcurrentStatusAnimations(24))
-    }
-
-    @Test
-    fun statusAnimationSlotsNeverExceedBatchBudget() {
-        assertEquals(0, statusAnimationSlot(0, 6))
-        assertEquals(1, statusAnimationSlot(1, 6))
-        assertEquals(-1, statusAnimationSlot(2, 6))
-        assertEquals(0, statusAnimationSlot(0, 24))
-        assertEquals(-1, statusAnimationSlot(1, 24))
     }
 
     @Test

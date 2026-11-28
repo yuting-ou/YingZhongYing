@@ -4,18 +4,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.unit.Density
 import com.vliveconvert.app.picker.AlbumInfo
 import com.vliveconvert.app.picker.MediaItem
 import com.vliveconvert.app.picker.MediaRepo
 import com.vliveconvert.app.picker.PickerScanner
 import com.vliveconvert.app.picker.PickerScreen
-import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -37,24 +33,8 @@ class PickerScreenshotTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private fun shot(name: String) {
-        shadowOf(Looper.getMainLooper()).idle()
-        val view = compose.activity.window.decorView
-        val w = if (view.width > 0) view.width else 1080
-        val h = if (view.height > 0) view.height else 2376
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bmp))
-        File("build/ui-shots").mkdirs()
-        File("build/ui-shots/$name.png").outputStream().use {
-            bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
-        }
-    }
-
-    private fun render(
-        darkTheme: Boolean = false,
-        fontScale: Float = 1f,
-        reduceMotion: Boolean = false
-    ) {
+    @Test
+    fun shotPickerSelected() {
         val bucket = 7L
         val scanner = PickerScanner(MediaRepo(compose.activity.contentResolver))
         val state = scanner.stateOf(bucket)
@@ -72,35 +52,27 @@ class PickerScreenshotTest {
         state.completed = true
 
         compose.setContent {
-            VLiveConvertTheme(darkTheme = darkTheme, dynamicColor = false) {
-                val density = LocalDensity.current
-                CompositionLocalProvider(
-                    LocalDensity provides Density(density.density, fontScale),
-                    LocalReduceMotion provides reduceMotion
-                ) {
-                    PickerScreen(
-                        albums = listOf(AlbumInfo(bucket, "Camera", items.size, items.first().id, 0L)),
-                        scanner = scanner,
-                        scannerScope = CoroutineScope(Dispatchers.Unconfined),
-                        onBack = {},
-                        onConfirm = {}
-                    )
-                }
+            VLiveConvertTheme(dynamicColor = false) {
+                PickerScreen(
+                    albums = listOf(AlbumInfo(bucket, "Camera", items.size, items.first().id, 0L)),
+                    scanner = scanner,
+                    scannerScope = CoroutineScope(Dispatchers.Unconfined),
+                    onBack = {},
+                    onConfirm = {}
+                )
             }
         }
         compose.onNodeWithText("全选").performClick()
         compose.waitForIdle()
-    }
-
-    @Test
-    fun shotPickerSelected() {
-        render()
-        shot("picker_glass")
-    }
-
-    @Test
-    fun shotPickerDarkLargeFontReduceMotion() {
-        render(darkTheme = true, fontScale = 2f, reduceMotion = true)
-        shot("apple_bc_picker_dark_large_reduce")
+        shadowOf(Looper.getMainLooper()).idle()
+        val view = compose.activity.window.decorView
+        val w = if (view.width > 0) view.width else 1080
+        val h = if (view.height > 0) view.height else 2376
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bmp))
+        val dir = File("build/ui-shots").apply { mkdirs() }
+        File(dir, "picker_glass.png").outputStream().use {
+            bmp.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
     }
 }
