@@ -213,6 +213,9 @@ internal fun SharedTransitionScope.OriginalViewer(
                             var up: PointerInputChange? = null
                             var moved = false
                             var verticalDismiss = false
+                            var gestureAxis = 0
+                            var totalDx = 0f
+                            var totalDy = 0f
                             var lastMoveUptime = down.uptimeMillis
                             var velocityPxSec = 0f
                             // 手势内同步累加的当前变换：Animatable 只能在协程里写，
@@ -226,12 +229,30 @@ internal fun SharedTransitionScope.OriginalViewer(
                                 val oldScale = liveScale
                                 val newScale = (oldScale * event.calculateZoom()).coerceIn(1f, 4f)
                                 val downChange = event.changes.firstOrNull { it.id == down.id }
-                                if (!verticalDismiss && pressed == 1 && liveScale <= 1.01f &&
-                                    downChange != null) {
-                                    val dy = downChange.position.y - downChange.previousPosition.y
+                                if (pressed >= 2 && verticalDismiss) {
+                                    verticalDismiss = false
+                                    viewerDragging = false
+                                    gestureAxis = 0
+                                    totalDx = 0f
+                                    totalDy = 0f
+                                    scope.launch { dismissOffset.snapTo(0f) }
+                                }
+                                if (pressed == 1 && downChange != null) {
                                     val dx = downChange.position.x - downChange.previousPosition.x
-                                    if (dy > 0f && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.15f &&
-                                        downChange.position.y - down.position.y > viewConfiguration.touchSlop) {
+                                    val dy = downChange.position.y - downChange.previousPosition.y
+                                    totalDx += dx
+                                    totalDy += dy
+                                    if (gestureAxis == 0 &&
+                                        maxOf(kotlin.math.abs(totalDx), kotlin.math.abs(totalDy)) >
+                                        viewConfiguration.touchSlop
+                                    ) {
+                                        gestureAxis = when {
+                                            kotlin.math.abs(totalDx) > kotlin.math.abs(totalDy) -> 1
+                                            totalDy > 0f -> 2
+                                            else -> 3
+                                        }
+                                    }
+                                    if (gestureAxis == 2 && !verticalDismiss && liveScale <= 1.01f) {
                                         verticalDismiss = true
                                         viewerDragging = true
                                     }

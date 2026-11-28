@@ -957,8 +957,17 @@ fun GlassProgressBar(
 
 /** 转换中的不确定进度：玻璃轨道里一段主题渐变光带循环掠过 */
 @Composable
-fun GlassIndeterminateBar(modifier: Modifier = Modifier, height: Dp = 3.dp) {
+fun GlassIndeterminateBar(
+    modifier: Modifier = Modifier,
+    height: Dp = 3.dp,
+    animate: Boolean = true
+) {
     val dark = isDarkGlass()
+    val animated = animate && MotionTokens.motionBudgetAllowsInfinite(
+        reduceMotion = LocalReduceMotion.current,
+        scrollPaused = LocalGlassScrollPaused.current,
+        compatibility = LocalGlassCompatibility.current
+    )
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
     val track: @Composable androidx.compose.foundation.layout.BoxScope.(Float) -> Unit = { phaseValue ->
@@ -976,7 +985,7 @@ fun GlassIndeterminateBar(modifier: Modifier = Modifier, height: Dp = 3.dp) {
             )
         }
     }
-    if (LocalReduceMotion.current) {
+    if (!animated) {
         // 静态分支：固定位置的一段光带（不建 infinite transition，零帧消耗）
         Box(
             modifier
@@ -1001,7 +1010,10 @@ fun GlassIndeterminateBar(modifier: Modifier = Modifier, height: Dp = 3.dp) {
             .height(height)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = if (dark) 0.18f else 0.08f))
-            .semantics { progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate }
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                contentDescription = "动态进度"
+            }
     ) {
         track(phase.value)
     }

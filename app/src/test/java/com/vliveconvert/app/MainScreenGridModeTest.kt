@@ -171,6 +171,28 @@ class MainScreenGridModeTest {
     }
 
     @Test
+    fun largeBatchLimitsAnimatedListBars() {
+        prefs().edit().putString("main_view_mode", "list").commit()
+        val queue = items(24).map { it.copy(status = "转换中…") }
+        compose.setContent {
+            TestMainScreen(queue = queue, converting = true, reduceMotion = false)
+        }
+        compose.waitForIdle()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithContentDescription("动态进度")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertTrue(
+            "24 张同时忙碌时列表最多一条动态进度，实际=" +
+                compose.onAllNodesWithContentDescription("动态进度")
+                    .fetchSemanticsNodes().size,
+            compose.onAllNodesWithContentDescription("动态进度")
+                .fetchSemanticsNodes().size <= 1
+        )
+        prefs().edit().remove("main_view_mode").commit()
+    }
+
+    @Test
     fun largeBatchLimitsAnimatedGridSpinners() {
         prefs().edit().putString("main_view_mode", "grid").commit()
         val queue = items(24).map { it.copy(status = "转换中…") }

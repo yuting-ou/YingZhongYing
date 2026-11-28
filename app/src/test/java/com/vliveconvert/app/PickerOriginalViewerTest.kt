@@ -185,6 +185,24 @@ class PickerOriginalViewerTest {
     }
 
     @Test
+    fun horizontalSwipeTurningDownDoesNotDismissViewer() {
+        render(listOf(media(1), media(2)))
+        compose.onNodeWithContentDescription("查看 IMG_1.jpg 原图").performClick()
+        compose.waitForIdle()
+
+        compose.onNodeWithTag("original_viewer").performTouchInput {
+            down(Offset(40f, center.y))
+            moveTo(Offset(150f, center.y + 10f), 100)
+            moveTo(Offset(260f, center.y + 180f), 300)
+            up()
+        }
+        compose.mainClock.advanceTimeBy(700)
+        compose.waitForIdle()
+
+        compose.onNodeWithContentDescription("关闭预览").assertExists()
+    }
+
+    @Test
     fun reducedMotion_opensViewerWithoutWaitingForTransition() {
         render(listOf(media(1)), reduceMotion = true)
 

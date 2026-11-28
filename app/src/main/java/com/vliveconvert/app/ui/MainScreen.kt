@@ -217,7 +217,7 @@ fun MainScreen(
     // 滚动状态在 GlassScrollPauseScope 内读取——MainScreen 不随滚动起停重组
     GlassScrollPauseScope(listState, gridState) {
     val reduceMotion = LocalReduceMotion.current
-    val titleCollapse by remember(viewMode) {
+    val titleCollapse by remember(viewMode, reduceMotion) {
         derivedStateOf {
             if (viewMode == "grid") {
                 largeTitleCollapse(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, reduceMotion)
@@ -1115,7 +1115,7 @@ private fun ConvertItemRow(
                     }
                     if (busy) {
                         Spacer(Modifier.height(5.dp))
-                        GlassIndeterminateBar(height = 3.dp)
+                        GlassIndeterminateBar(height = 3.dp, animate = animateStatus)
                     }
                 }
 
