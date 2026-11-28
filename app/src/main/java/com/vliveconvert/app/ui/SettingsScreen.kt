@@ -529,8 +529,6 @@ private fun SettingsToolCard(
         .clickable(interactionSource = interaction, indication = null,
             role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SettingsGlyph(icon, accent)
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = settingsCardTitleStyle(),
                     color = if (destructive && available) accent else MaterialTheme.colorScheme.onSurface)
@@ -539,6 +537,8 @@ private fun SettingsToolCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
+            SettingsGlyph(icon, accent)
+            Spacer(Modifier.width(4.dp))
             SettingsChevron(MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -566,8 +566,6 @@ private fun SettingsToggleCard(
             interactionSource = interaction, indication = null,
             onValueChange = onToggle)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            SettingsGlyph(icon, if (enabled) primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = settingsCardTitleStyle(),
                     color = if (enabled) MaterialTheme.colorScheme.onSurface
@@ -576,6 +574,8 @@ private fun SettingsToggleCard(
                 Text(description, style = settingsDescriptionStyle(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Spacer(Modifier.width(8.dp))
+            SettingsGlyph(icon, if (enabled) primary else MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             Switch(
                 checked = checked, onCheckedChange = null, enabled = enabled,
