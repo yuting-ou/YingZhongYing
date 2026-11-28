@@ -7,6 +7,7 @@ import android.util.LruCache
 import android.util.Size
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloat
@@ -89,14 +90,15 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 @Composable
 internal fun rememberPressScale(
     interactionSource: MutableInteractionSource,
-    pressedScale: Float = 0.97f
+    pressedScale: Float = 0.97f,
+    spec: FiniteAnimationSpec<Float> = MotionTokens.Press
 ): androidx.compose.runtime.State<Float> {
     val pressed by interactionSource.collectIsPressedAsState()
     val reduceMotion = LocalReduceMotion.current
     return androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (pressed) pressedScale else 1f,
         animationSpec = if (reduceMotion) androidx.compose.animation.core.snap()
-        else MotionTokens.Snappy,
+        else spec,
         label = "pressScale"
     )
 }

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.dp
 import com.vliveconvert.app.ui.LocalReduceMotion
 import com.vliveconvert.app.ui.animateGlassDispersion
+import com.vliveconvert.app.ui.rememberPressScale
 import com.vliveconvert.app.ui.theme.VLiveConvertTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -60,6 +61,34 @@ class GlassPressFeedbackTest {
         compose.runOnIdle { source.tryEmit(PressInteraction.Release(press)) }
         compose.mainClock.advanceTimeBy(1_200)
         compose.runOnIdle { assertTrue("松开后应接近 0，实际 $latest", latest < 0.05f) }
+    }
+
+    @Test
+    fun pressScaleUsesPressSpringAndCancelReturnsToRest() {
+        val source = MutableInteractionSource()
+        var latest = 1f
+        compose.setContent {
+            VLiveConvertTheme(dynamicColor = false) {
+                val scale = rememberPressScale(source, pressedScale = 0.96f)
+                val observed = scale.value
+                SideEffect { latest = observed }
+                Box(Modifier.size(48.dp))
+            }
+        }
+        compose.waitForIdle()
+        val press = PressInteraction.Press(Offset.Zero)
+
+        var emitted = false
+        compose.runOnIdle { emitted = source.tryEmit(press) }
+        assertTrue("交互源必须接受 Press", emitted)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.runOnIdle { assertEquals("按下后 scale=$latest", 0.96f, latest, 0.01f) }
+
+        compose.runOnIdle { source.tryEmit(PressInteraction.Cancel(press)) }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.runOnIdle { assertEquals("取消后必须回到稳定 1", 1f, latest, 0.01f) }
     }
 
     @Test

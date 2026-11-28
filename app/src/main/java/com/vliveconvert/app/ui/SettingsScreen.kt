@@ -41,7 +41,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -527,7 +526,7 @@ private fun SettingsToolCard(
     SettingsCard(modifier
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
-        .clickable(interactionSource = interaction, indication = LocalIndication.current,
+        .clickable(interactionSource = interaction, indication = null,
             role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SettingsGlyph(icon, accent)
@@ -564,7 +563,7 @@ private fun SettingsToggleCard(
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
         .toggleable(value = checked, enabled = enabled, role = Role.Switch,
-            interactionSource = interaction, indication = LocalIndication.current,
+            interactionSource = interaction, indication = null,
             onValueChange = onToggle)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SettingsGlyph(icon, if (enabled) primary else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -602,7 +601,7 @@ private fun SettingsLinkCard(title: String, description: String, onClick: () -> 
     SettingsCard(Modifier
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
         .clip(continuousShape(24.dp))
-        .clickable(interactionSource = interaction, indication = LocalIndication.current,
+        .clickable(interactionSource = interaction, indication = null,
             role = Role.Button, onClick = onClick)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
